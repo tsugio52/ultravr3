@@ -343,9 +343,17 @@
 
     // VR Controls
     let controller1, controller2;
+    let hand1, hand2;
     let raycasterVR;
-    let vrUI = []; 
-    let vrThrowCooldown = 0; // VR用の投擲クールダウン
+    let vrUI = [];
+    let vrThrowCooldown = 0;
+    let vrHandMode = false; // Questの実ハンドトラッキングを優先
+    const VR_HAND_POT_SCALE = 0.16;
+    const VR_HAND_HOLD_OFFSET = new THREE.Vector3(0, -0.055, -0.115);
+    const vrHandState = {
+      right: { lastPalm: null, velocity: new THREE.Vector3(), smoothVelocity: new THREE.Vector3(), active: false, lastSeen: 0 },
+      left:  { lastPalm: null, velocity: new THREE.Vector3(), smoothVelocity: new THREE.Vector3(), active: false, lastSeen: 0 }
+    };
 
     // Simulation timing & scales
     let isSlowMo = false;
@@ -766,19 +774,21 @@
 
         const uiIntersects = raycasterVR.intersectObjects(vrUI.map(u => u.mesh));
         if (uiIntersects.length > 0) {
-            const hitUI = vrUI.find(u => u.mesh === uiIntersects[0].object);
-            if (hitUI) {
-                if (hitUI.action === 'reset') resetTower();
-                else if (hitUI.action === 'change') cyclePotType();
-                playAuthenticImpactAudio(0.5); createTapRippleUI(window.innerWidth/2, window.innerHeight/2);
-            }
+          const hitUI = vrUI.find(u => u.mesh === uiIntersects[0].object);
+          if (hitUI) {
+            if (hitUI.action === 'reset') resetTower();
+            else if (hitUI.action === 'change') cyclePotType();
+            playAuthenticImpactAudio(0.5);
+            createTapRippleUI(window.innerWidth/2, window.innerHeight/2);
+          }
         }
       }
 
       function onConnected(event) {
-         this.userData.handedness = event.data.handedness;
+        this.userData.handedness = event.data.handedness;
       }
 
+      // Controllers are retained as a fallback.  Hand tracking is the primary input.
       controller1 = renderer.xr.getController(0);
       controller1.addEventListener('selectstart', onSelectStartVR);
       controller1.addEventListener('connected', onConnected);
@@ -789,107 +799,215 @@
       controller2.addEventListener('connected', onConnected);
       scene.add(controller2);
 
-      const lineGeo = new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(0, 0, 0), new THREE.Vector3(0, 0, -1)]);
-      const lineMat = new THREE.LineBasicMaterial({ color: 0xffaa00, transparent: true, opacity: 0.5 });
-      const line1 = new THREE.Line(lineGeo, lineMat); line1.name = 'line'; line1.scale.z = 20; controller1.add(line1);
-      const line2 = new THREE.Line(lineGeo, lineMat); line2.name = 'line'; line2.scale.z = 20; controller2.add(line2);
+      // Actual WebXR hand spaces (Quest hand tracking).
+      hand1 = renderer.xr.getHand(0);
+      hand2 = renderer.xr.getHand(1);
+      scene.add(hand1);
+      scene.add(hand2);
     }
 
-    function updateVRControllers(dt) {
+    function getHandednessFromHand(hand) {
+      const inputSources = renderer.xr.getSession()?.inputSources || [];
+      for (const source of inputSources) {
+        if (source.hand) {
+          // The Hand object itself does not expose handedness consistently across
+          // browser versions, so match the XR input source to its hand reference.
+          if (source.hand === hand.joints || source.hand === hand) return source.handedness;
+        }
+      }
+      return null;
+    }
+
+    function findXRHandBySide(side) {
+      const session = renderer.xr.getSession();
+      if (!session) return null;
+      for (const source of session.inputSources) {
+        if (source.hand && source.handedness === side) {
+          if (hand1 && hand1.joints && hand1.joints.wrist && hand1.joints.wrist.jointSpace === source.hand.get('wrist')) return hand1;
+          if (hand2 && hand2.joints && hand2.joints.wrist && hand2.joints.wrist.jointSpace === source.hand.get('wrist')) return hand2;
+        }
+      }
+      // Fallback: inspect the joint groups themselves.
+      const candidates = [hand1, hand2].filter(h => h && h.joints && h.joints.wrist);
+      return candidates.length === 1 ? candidates[0] : null;
+    }
+
+    function getPalmPose(hand) {
+      if (!hand || !hand.joints) return null;
+      const j = hand.joints;
+      const wrist = j['wrist'];
+      const indexMcp = j['index-finger-metacarpal'];
+      const middleMcp = j['middle-finger-metacarpal'];
+      const ringMcp = j['ring-finger-metacarpal'];
+      const pinkyMcp = j['pinky-finger-metacarpal'];
+      if (!wrist || !indexMcp || !middleMcp || !ringMcp || !pinkyMcp) return null;
+
+      const p = new THREE.Vector3();
+      const pi = new THREE.Vector3();
+      const pm = new THREE.Vector3();
+      const pr = new THREE.Vector3();
+      const pp = new THREE.Vector3();
+      wrist.getWorldPosition(p);
+      indexMcp.getWorldPosition(pi);
+      middleMcp.getWorldPosition(pm);
+      ringMcp.getWorldPosition(pr);
+      pinkyMcp.getWorldPosition(pp);
+
+      // Palm center: slightly toward the fingers from the wrist.
+      const palm = pi.clone().add(pm).add(pr).add(pp).multiplyScalar(0.25);
+      palm.lerp(p, 0.28);
+
+      // Finger direction is used only for orienting the held pot, not for throw speed.
+      const fingerDir = pm.clone().sub(p).normalize();
+      const across = pp.clone().sub(pi).normalize();
+      const palmNormal = new THREE.Vector3().crossVectors(across, fingerDir).normalize();
+
+      // Stable hand orientation: X = across fingers, Y = toward fingers,
+      // Z = palm normal. This avoids relying on controller grip orientation.
+      const basis = new THREE.Matrix4();
+      const xAxis = across.clone().normalize();
+      const yAxis = fingerDir.clone().normalize();
+      const zAxis = new THREE.Vector3().crossVectors(xAxis, yAxis).normalize();
+      const correctedY = new THREE.Vector3().crossVectors(zAxis, xAxis).normalize();
+      basis.makeBasis(xAxis, correctedY, zAxis);
+      const quat = new THREE.Quaternion().setFromRotationMatrix(basis);
+
+      return { position: palm, quaternion: quat, normal: palmNormal };
+    }
+
+    function getNativePalmPose(inputSource, frame, referenceSpace) {
+      if (!inputSource || !inputSource.hand || !frame || !referenceSpace) return null;
+      const names = ['wrist', 'index-finger-metacarpal', 'middle-finger-metacarpal', 'ring-finger-metacarpal', 'pinky-finger-metacarpal'];
+      const poses = {};
+      for (const name of names) {
+        const space = inputSource.hand.get(name);
+        if (!space) return null;
+        const pose = frame.getJointPose(space, referenceSpace);
+        if (!pose) return null;
+        poses[name] = pose;
+      }
+
+      const point = name => new THREE.Vector3(
+        poses[name].transform.position.x,
+        poses[name].transform.position.y,
+        poses[name].transform.position.z
+      );
+      const wrist = point('wrist');
+      const index = point('index-finger-metacarpal');
+      const middle = point('middle-finger-metacarpal');
+      const ring = point('ring-finger-metacarpal');
+      const pinky = point('pinky-finger-metacarpal');
+      const palm = index.clone().add(middle).add(ring).add(pinky).multiplyScalar(0.25).lerp(wrist, 0.28);
+
+      const q = poses.wrist.transform.orientation;
+      const quaternion = new THREE.Quaternion(q.x, q.y, q.z, q.w);
+      return { position: palm, quaternion };
+    }
+
+    function updateNativeHandThrow(inputSource, frame, dt) {
+      const referenceSpace = renderer.xr.getReferenceSpace();
+      const pose = getNativePalmPose(inputSource, frame, referenceSpace);
+      const state = vrHandState.right;
+      if (!pose) {
+        state.active = false;
+        state.lastPalm = null;
+        return false;
+      }
+
+      state.active = true;
+      const current = pose.position;
+      if (!state.lastPalm) state.lastPalm = current.clone();
+      const safeDt = Math.max(0.008, Math.min(0.05, dt || 0.016));
+      const rawVelocity = current.clone().sub(state.lastPalm).divideScalar(safeDt);
+      state.lastPalm.copy(current);
+      state.velocity.copy(rawVelocity);
+      state.smoothVelocity.lerp(rawVelocity, 0.62);
+
+      if (vrThrowCooldown > 0) return false;
+      if (!readyPot || !readyPot.mesh) spawnReadyPot();
+      if (!readyPot || !readyPot.mesh) return false;
+
+      const offset = VR_HAND_HOLD_OFFSET.clone().applyQuaternion(pose.quaternion);
+      readyPot.mesh.position.copy(current).add(offset);
+      readyPot.mesh.quaternion.copy(pose.quaternion);
+      readyPot.mesh.scale.set(VR_HAND_POT_SCALE, VR_HAND_POT_SCALE, VR_HAND_POT_SCALE);
+      readyPot.spawnProgress = 1.0;
+
+      // Quest hand tracking can jitter by a few centimeters.  We therefore use
+      // a smoothed palm velocity and require a clear forward impulse.
+      const forwardSpeed = -state.smoothVelocity.z;
+      const lateralSpeed = Math.hypot(state.smoothVelocity.x, state.smoothVelocity.y * 0.55);
+      const throwDetected = forwardSpeed > 1.25 &&
+                            state.smoothVelocity.length() > 1.45 &&
+                            forwardSpeed > lateralSpeed * 0.95;
+      if (!throwDetected) return false;
+
+      const throwVel = state.smoothVelocity.clone();
+      throwVel.y *= 0.35;
+      throwVel.x *= 0.75;
+      throwVel.z = -THREE.MathUtils.clamp(forwardSpeed * 2.55, 5.8, 15.5);
+      launchPotWithPhysics(current.clone(), throwVel);
+      vrThrowCooldown = 0.34;
+      state.lastPalm = current.clone();
+      state.smoothVelocity.set(0, 0, 0);
+      return true;
+    }
+
+    function updateVRControllers(dt, frame) {
       if (!renderer.xr.isPresenting) return;
       if (vrThrowCooldown > 0) vrThrowCooldown -= dt;
 
-      // 1. Raycast UI Pointer
-      [controller1, controller2].forEach(controller => {
-        if (controller && controller.visible) {
-          const tempMatrix = new THREE.Matrix4();
-          tempMatrix.identity().extractRotation(controller.matrixWorld);
-          raycasterVR.ray.origin.setFromMatrixPosition(controller.matrixWorld);
-          raycasterVR.ray.direction.set(0, 0, -1).applyMatrix4(tempMatrix);
-          let hitDist = 20;
-          const uiIntersects = raycasterVR.intersectObjects(vrUI.map(u => u.mesh));
-          if (uiIntersects.length > 0) { hitDist = uiIntersects[0].distance; } 
-          else {
-              const hitPoint = new THREE.Vector3();
-              if (raycasterVR.ray.intersectPlane(wallAimPlane, hitPoint)) {
-                  hitDist = raycasterVR.ray.origin.distanceTo(hitPoint);
-                  hitPoint.x = Math.max(-ARENA.sideX + 1.2, Math.min(ARENA.sideX - 1.2, hitPoint.x));
-                  hitPoint.y = Math.max(ARENA.floorY + 0.6, Math.min(ARENA.ceilY - 0.5, hitPoint.y));
-                  hitPoint.z = ARENA.wallZ;
-                  if (wallTargetMarker) wallTargetMarker.position.copy(hitPoint);
-              }
-          }
-          const line = controller.getObjectByName('line');
-          if (line) line.scale.z = hitDist;
+      // Hand tracking is the primary input on Quest 3S. Use the native XRFrame
+      // so handedness is taken directly from the XRInputSource and never inferred
+      // from controller index. This makes hand-to-pot release much more reliable.
+      const session = renderer.xr.getSession();
+      if (session && frame) {
+        const rightSource = Array.from(session.inputSources).find(src => src.hand && src.handedness === 'right');
+        if (rightSource) {
+          vrHandMode = true;
+          updateNativeHandThrow(rightSource, frame, dt);
+          return;
         }
-      });
+      }
 
-      // 2. 自動ジェスチャー投擲ロジック
+      // Controller fallback for devices/browsers where hand tracking is unavailable.
+      vrHandMode = false;
       let targetController = null;
       if (controller2 && controller2.userData.handedness === 'right' && controller2.visible) targetController = controller2;
       else if (controller1 && controller1.userData.handedness === 'right' && controller1.visible) targetController = controller1;
       else if (controller1 && controller1.visible) targetController = controller1;
       else if (controller2 && controller2.visible) targetController = controller2;
 
-      if (targetController) {
-          const currentPos = new THREE.Vector3().setFromMatrixPosition(targetController.matrixWorld);
-          const currentRot = new THREE.Quaternion().setFromRotationMatrix(targetController.matrixWorld);
-          const data = targetController.userData;
+      if (!targetController) return;
 
-          if (!data.lastPos) data.lastPos = currentPos.clone();
-          const rawVel = new THREE.Vector3().subVectors(currentPos, data.lastPos).divideScalar(dt || 0.016);
-          data.lastPos.copy(currentPos);
+      const currentPos = new THREE.Vector3().setFromMatrixPosition(targetController.matrixWorld);
+      const currentRot = new THREE.Quaternion().setFromRotationMatrix(targetController.matrixWorld);
+      const data = targetController.userData;
+      if (!data.lastPos) data.lastPos = currentPos.clone();
+      const rawVel = currentPos.clone().sub(data.lastPos).divideScalar(Math.max(0.008, dt || 0.016));
+      data.lastPos.copy(currentPos);
+      if (!data.vel) data.vel = new THREE.Vector3();
+      data.vel.lerp(rawVel, 0.5);
 
-          if (!data.vel) data.vel = new THREE.Vector3();
-          data.vel.lerp(rawVel, 0.45); 
+      if (vrThrowCooldown <= 0) {
+        if (!readyPot || !readyPot.mesh) spawnReadyPot();
+        if (readyPot && readyPot.mesh) {
+          const offset = new THREE.Vector3(0, -0.08, -0.13).applyQuaternion(currentRot);
+          readyPot.mesh.position.copy(currentPos).add(offset);
+          readyPot.mesh.quaternion.copy(currentRot);
+          readyPot.mesh.scale.set(VR_HAND_POT_SCALE, VR_HAND_POT_SCALE, VR_HAND_POT_SCALE);
+          readyPot.spawnProgress = 1.0;
 
-          // 手の「前方向」を基準にする。
-          // Quest 3Sで体の向きを変えても、「手を前へ突き出す」動作になる。
-          const handForward = new THREE.Vector3(0, 0, -1).applyQuaternion(currentRot).normalize();
-          const forwardSpeed = data.vel.dot(handForward);
-          const lateralSpeed = data.vel.clone().sub(
-              handForward.clone().multiplyScalar(forwardSpeed)
-          ).length();
-
-          // 前方向へ十分に突き出した時だけ投擲。
-          // 横方向の動きだけでは誤発射しない。
-          const isForwardThrust =
-              forwardSpeed > 1.15 &&
-              data.vel.length() > 1.35 &&
-              forwardSpeed > lateralSpeed * 1.15;
-
-          if (vrThrowCooldown <= 0 && isForwardThrust && readyPot && readyPot.mesh) {
-              // 実際の手の移動速度を主体にした自然な投擲。
-              // 上方向への強制補正は入れず、手を出した方向へ飛ばす。
-              const throwSpeed = THREE.MathUtils.clamp(
-                  forwardSpeed * 2.35,
-                  5.5,
-                  15.0
-              );
-              const throwVel = handForward.clone().multiplyScalar(throwSpeed);
-
-              // 手が少し上下に動いた場合だけ、その成分を少し残す。
-              throwVel.y += data.vel.y * 0.22;
-
-              launchPotWithPhysics(currentPos, throwVel);
-              vrThrowCooldown = 0.38;
-              data.lastThrowForward = handForward.clone();
+          const forwardSpeed = -data.vel.z;
+          if (forwardSpeed > 1.25 && data.vel.length() > 1.45) {
+            const throwVel = data.vel.clone();
+            throwVel.y *= 0.35;
+            throwVel.x *= 0.75;
+            throwVel.z = -THREE.MathUtils.clamp(forwardSpeed * 2.55, 5.8, 15.5);
+            launchPotWithPhysics(currentPos.clone(), throwVel);
+            vrThrowCooldown = 0.34;
           }
-          else if (vrThrowCooldown <= 0) {
-              if (!readyPot || !readyPot.mesh) spawnReadyPot();
-
-              if (readyPot && readyPot.mesh) {
-                  // 手のひらの少し前・少し下に鉢を保持する。
-                  // 実物の小型植木鉢に近いサイズ感。
-                  const offset = new THREE.Vector3(0, -0.08, -0.13).applyQuaternion(currentRot);
-                  readyPot.mesh.position.copy(currentPos).add(offset);
-                  readyPot.mesh.quaternion.copy(currentRot);
-
-                  // VRで持っている時のサイズ：従来の0.25 → 0.16
-                  readyPot.mesh.scale.set(0.16, 0.16, 0.16);
-                  readyPot.spawnProgress = 1.0;
-              }
-          }
+        }
       }
     }
 
@@ -1398,21 +1516,14 @@
         let potToThrow = readyPot;
         if (!potToThrow || !potToThrow.mesh) return;
         
-        // 手に持っていた実寸感を、そのまま投げた後も維持する。
-        // 投げた瞬間だけ巨大化しない。
-        const vrPotScale = 0.16;
-        potToThrow.mesh.scale.set(vrPotScale, vrPotScale, vrPotScale);
+        // ★ 投げたあとも縮小サイズ(0.25)を維持して飛んでいくように
+        potToThrow.mesh.scale.set(VR_HAND_POT_SCALE, VR_HAND_POT_SCALE, VR_HAND_POT_SCALE); 
 
         flyingPots.push({
             mesh: potToThrow.mesh, bodyMat: potToThrow.bodyMat, soilMat: potToThrow.soilMat, leafMat: potToThrow.leafMat,
             potType: potToThrow.potType || activePotType, velocity: velocity.clone(),
-            angularVel: new THREE.Vector3(
-                (Math.random() - 0.5) * 4 + 6,
-                (Math.random() - 0.5) * 7,
-                -velocity.z * 0.22
-            ),
-            trailTimer: 0,
-            scaleMultiplier: vrPotScale
+            angularVel: new THREE.Vector3((Math.random() - 0.5) * 6 + 9, (Math.random() - 0.5) * 10, -velocity.z * 0.35), trailTimer: 0,
+            scaleMultiplier: VR_HAND_POT_SCALE // ★ VR投擲時のサイズに合わせる
         });
         readyPot = null; showSpeedLines(); playThrowWhooshAudio(Math.abs(velocity.z) / 18.0);
     }
@@ -1495,13 +1606,13 @@
     }
 
     let lastTimestamp = 0;
-    function animateFrame(time) {
+    function animateFrame(time, frame) {
       if (lastTimestamp === 0) lastTimestamp = time;
       const dt = (time - lastTimestamp) / 1000;
       lastTimestamp = time;
 
       stepPhysics(dt);
-      updateVRControllers(dt);
+      updateVRControllers(dt, frame);
       renderer.render(scene, camera);
     }
 
