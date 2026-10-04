@@ -901,7 +901,7 @@
                 if (hitUI.action === 'reset') resetTower();
                 else if (hitUI.action === 'change') cyclePotType();
                 playAuthenticImpactAudio(0.5);
-                createTapRippleUI(window.innerWidth/2, window.innerHeight/2);
+                createTapRippleUI(window.innerWidth/2, window.innerHeight/2); // dummy feedback
             }
             return;
         }
@@ -919,27 +919,53 @@
         if (!data.isHolding) return;
         data.isHolding = false;
 
-        // トリガーを離した瞬間、軌跡から速度を計算して物理ベースで発射
-        if (data.history.length > 2) {
-            const oldest = data.history[0];
-            const newest = data.history[data.history.length - 1];
+        // 【投擲フィールの改善】 
+        // 指を離す瞬間のコントローラーのブレ（すっぽ抜け）を防止するため、直近2フレームは捨てる
+        const validHistory = data.history.slice(0, Math.max(1, data.history.length - 2));
+
+        if (validHistory.length >= 2) {
+            const newest = validHistory[validHistory.length - 1];
+            let oldest = validHistory[0];
+            
+            // 約0.1秒（100ms）前の位置との差分から、安定したスイング速度を計算
+            for (let i = validHistory.length - 1; i >= 0; i--) {
+                if (newest.time - validHistory[i].time > 100) {
+                    oldest = validHistory[i];
+                    break;
+                }
+            }
+
             const dt = (newest.time - oldest.time) / 1000;
             
             if (dt > 0.01) {
-                const velocity = new THREE.Vector3().subVectors(newest.pos, oldest.pos).divideScalar(dt);
-                // 手の振りを拡張して投げやすく補正
-                velocity.multiplyScalar(4.5); 
-                velocity.y += 2.0; // 少し上向きに山なりの補正
+                // 1. 腕を振る速度（軌跡からのベクトル）
+                const swingVelocity = new THREE.Vector3().subVectors(newest.pos, oldest.pos).divideScalar(dt);
                 
-                if (velocity.length() > 2.0) {
-                    launchPotWithPhysics(newest.pos, velocity);
+                // 2. コントローラーの向き（手首のスナップ、押し出し方向）
+                const tempMatrix = new THREE.Matrix4().makeRotationFromQuaternion(newest.rot);
+                const forwardDir = new THREE.Vector3(0, 0, -1).applyMatrix4(tempMatrix);
+                
+                // --- 調整パラメーター ---
+                const swingMultiplier = 3.5; // 腕の振りの威力を何倍にするか
+                const forwardAssist = 5.0;   // コントローラが向いている方向への押し出し力（エイム補正）
+                const upwardAssist = 1.4;    // 重力で落ちすぎないための上方向アシスト
+                
+                const finalVelocity = swingVelocity.multiplyScalar(swingMultiplier);
+                finalVelocity.addScaledVector(forwardDir, forwardAssist);
+                finalVelocity.y += upwardAssist;
+                
+                // 一定以上のスピードがあれば投げる
+                if (finalVelocity.length() > 3.0) {
+                    launchPotWithPhysics(newest.pos, finalVelocity);
                 } else if (readyPot && readyPot.mesh) {
-                    // 手を離しただけで振りが弱い場合は元の位置へ戻す
+                    // 弱すぎる場合は元の位置に戻す
                     readyPot.mesh.position.copy(ARENA.readyPos);
+                    readyPot.mesh.scale.set(0.1, 0.1, 0.1);
                 }
             }
         } else if (readyPot && readyPot.mesh) {
             readyPot.mesh.position.copy(ARENA.readyPos);
+            readyPot.mesh.scale.set(0.1, 0.1, 0.1);
         }
       }
 
@@ -953,6 +979,7 @@
       controller2.addEventListener('selectend', onSelectEndVR);
       scene.add(controller2);
 
+      // コントローラー・ハンドトラッキングのレイ（光線）
       const geometry = new THREE.BufferGeometry().setFromPoints([
         new THREE.Vector3(0, 0, 0),
         new THREE.Vector3(0, 0, -1)
@@ -1003,14 +1030,16 @@
           const data = getControllerData(controller);
           if (data && data.isHolding) {
               const currentPos = new THREE.Vector3().setFromMatrixPosition(controller.matrixWorld);
-              data.history.push({ pos: currentPos.clone(), time: now });
-              // 過去15フレームを保持して速度計算に使用
-              if (data.history.length > 15) data.history.shift(); 
+              const currentRot = new THREE.Quaternion().setFromRotationMatrix(controller.matrixWorld);
+              data.history.push({ pos: currentPos.clone(), rot: currentRot.clone(), time: now });
+              
+              // 過去20フレーム（少し長め）を保持して安定した速度計算に使用
+              if (data.history.length > 20) data.history.shift(); 
               
               if (readyPot && readyPot.mesh) {
                   // 植木鉢をコントローラー（手）の位置にスナップさせる
                   readyPot.mesh.position.copy(currentPos);
-                  readyPot.mesh.quaternion.setFromRotationMatrix(controller.matrixWorld);
+                  readyPot.mesh.quaternion.copy(currentRot);
                   readyPot.spawnProgress = 1.0;
                   readyPot.mesh.scale.set(1, 1, 1);
               }
