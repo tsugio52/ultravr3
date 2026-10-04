@@ -348,7 +348,7 @@
     let vrUI = [];
     let vrThrowCooldown = 0;
     let vrHandMode = false; // Questの実ハンドトラッキングを優先
-    const VR_HAND_POT_SCALE = 0.16;
+    const VR_HAND_POT_SCALE = 0.19;
     const VR_HAND_HOLD_OFFSET = new THREE.Vector3(0, -0.055, -0.115);
     const vrHandState = {
       right: { lastPalm: null, velocity: new THREE.Vector3(), smoothVelocity: new THREE.Vector3(), active: false, lastSeen: 0 },
@@ -936,16 +936,22 @@
       // Quest hand tracking can jitter by a few centimeters.  We therefore use
       // a smoothed palm velocity and require a clear forward impulse.
       const forwardSpeed = -state.smoothVelocity.z;
-      const lateralSpeed = Math.hypot(state.smoothVelocity.x, state.smoothVelocity.y * 0.55);
-      const throwDetected = forwardSpeed > 1.25 &&
-                            state.smoothVelocity.length() > 1.45 &&
-                            forwardSpeed > lateralSpeed * 0.95;
+      const upwardSpeed = Math.max(0, state.smoothVelocity.y);
+      const sidewaysSpeed = Math.abs(state.smoothVelocity.x);
+      // 前方向を残しつつ、上方向の腕の振りも投擲動作として認識。
+      const throwEnergy = Math.hypot(Math.max(0, forwardSpeed), upwardSpeed * 0.9);
+      const throwDetected = forwardSpeed > 0.75 &&
+                            state.smoothVelocity.length() > 1.0 &&
+                            throwEnergy > 1.15 &&
+                            forwardSpeed > sidewaysSpeed * 0.55;
       if (!throwDetected) return false;
 
       const throwVel = state.smoothVelocity.clone();
-      throwVel.y *= 0.35;
+      // 上向きの動きを以前より強く反映する。これで斜め上への投擲が可能。
+      throwVel.y *= 0.82;
       throwVel.x *= 0.75;
-      throwVel.z = -THREE.MathUtils.clamp(forwardSpeed * 2.55, 5.8, 15.5);
+      throwVel.z = -THREE.MathUtils.clamp(forwardSpeed * 2.55, 5.0, 15.5);
+      if (upwardSpeed > 0.8) throwVel.y += Math.min(upwardSpeed * 0.35, 2.8);
       launchPotWithPhysics(current.clone(), throwVel);
       vrThrowCooldown = 0.34;
       state.lastPalm = current.clone();
