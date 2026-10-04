@@ -34,6 +34,7 @@
       touch-action: none;
     }
 
+    /* Glass UI effect */
     .glass-card {
       background: rgba(14, 18, 27, 0.85);
       backdrop-filter: blur(16px);
@@ -58,6 +59,7 @@
       transform: scale(0.95);
     }
 
+    /* Dramatic Speed Lines during heavy throw */
     #speed-overlay {
       position: absolute;
       inset: 0;
@@ -74,6 +76,7 @@
       -webkit-mask-image: radial-gradient(circle, transparent 45%, black 80%);
     }
 
+    /* Slingshot Pull Vector line */
     #trajectory-svg {
       position: absolute;
       inset: 0;
@@ -81,6 +84,7 @@
       z-index: 15;
     }
 
+    /* Target Reticle Pulsing */
     @keyframes rippleAnim {
       0% { transform: translate(-50%, -50%) scale(0.4); opacity: 1; }
       100% { transform: translate(-50%, -50%) scale(2.2); opacity: 0; }
@@ -96,6 +100,7 @@
       z-index: 25;
     }
 
+    /* Impact flash */
     #flash-overlay {
       position: absolute;
       inset: 0;
@@ -106,6 +111,7 @@
       z-index: 30;
     }
 
+    /* Dynamic Tower Crash text popup */
     @keyframes crashPopupAnim {
       0% { transform: translate(-50%, -50%) scale(0.4) rotate(-8deg); opacity: 0; }
       20% { transform: translate(-50%, -50%) scale(1.25) rotate(4deg); opacity: 1; }
@@ -127,6 +133,7 @@
       text-shadow: 0 0 24px rgba(249, 115, 22, 0.85), 0 4px 14px rgba(0, 0, 0, 0.95);
     }
 
+    /* Horizontal & Vertical scrollbar hidden */
     .no-scrollbar::-webkit-scrollbar {
       display: none;
     }
@@ -135,12 +142,14 @@
       scrollbar-width: none;
     }
 
+    /* Shotgun Mode active glow */
     .shotgun-active {
       background: linear-gradient(135deg, #a855f7, #ec4899) !important;
       box-shadow: 0 0 18px rgba(236, 72, 153, 0.7) !important;
       border-color: rgba(255, 255, 255, 0.8) !important;
     }
 
+    /* VR Button Adjustment */
     #VRButton {
       z-index: 50 !important;
       background: rgba(249, 115, 22, 0.9) !important;
@@ -215,6 +224,7 @@
 
       <div class="w-8 h-[1px] bg-white/20 my-0.5 self-center"></div>
 
+      <!-- 💥 特殊ポット（爆弾・水晶・溶岩） -->
       <button id="type-dynamite" onclick="setPotType('dynamite')" class="pot-type-btn w-12 h-11 rounded-xl text-xs font-bold flex flex-col items-center justify-center text-rose-300 hover:text-white hover:bg-rose-600/30 border border-rose-500/30 transition" title="💣 ダイナマイト鉢 (大爆発)">
         <i class="fa-solid fa-bomb text-sm text-rose-400"></i>
         <span class="text-[9px] mt-0.5 font-bold">爆弾</span>
@@ -235,6 +245,7 @@
   <!-- 👉 右側縦型ドック：ユーティリティ ＆ アクション（右手親指で操作） -->
   <div class="absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none z-20 flex flex-col items-end gap-2.5">
     
+    <!-- 上段：ユーティリティ縦バー（タワー再建・カメラ・スロー・清掃など） -->
     <div class="glass-card rounded-2xl p-1.5 flex flex-col gap-1.5 pointer-events-auto shadow-xl" onpointerdown="event.stopPropagation()">
       <button onclick="resetTower()" class="glass-btn w-11 h-10 rounded-xl flex items-center justify-center text-amber-300 hover:bg-amber-500/20" title="ピラミッドタワーを再構築">
         <i class="fa-solid fa-cubes-stacked text-sm"></i>
@@ -256,7 +267,7 @@
       </button>
     </div>
 
-    <!-- 下段：アクション投擲（3連射 ＆ 全力投球） -->
+    <!-- 下段：アクション投擲（3連射 ＆ 全力投球）右手親指のベストポジション -->
     <div class="flex flex-col gap-2 pointer-events-auto" onpointerdown="event.stopPropagation()">
       <button id="shotgun-toggle-btn" onclick="toggleShotgunMode()" class="glass-btn w-14 h-12 rounded-2xl flex flex-col items-center justify-center text-slate-200 border border-purple-400/40 hover:text-white shadow-lg" title="3連ショットガン射出">
         <i class="fa-solid fa-burst text-purple-400 text-sm"></i>
@@ -268,7 +279,6 @@
         <span class="text-[9px] font-black tracking-tighter mt-0.5">全力投球</span>
       </button>
     </div>
-
   </div>
 
   <!-- Throw Guidance / Dynamic Power Reticle -->
@@ -289,14 +299,15 @@
     </div>
     <h2 class="text-base font-black text-white mb-1">壁やタワーを直接タップ！</h2>
     <p class="text-[11px] text-slate-300 leading-relaxed mb-3">
-      壊したい場所を<strong class="text-amber-300">ポンと直接タップ</strong>すると、一直線に飛んで激突粉砕！<br>
-      VRの場合は「ENTER VR」を押し、<strong class="text-amber-300">トリガーで掴んでから腕を振って離す</strong>と物理的に投げられます。
+      壊したい場所を<strong class="text-amber-300">ポンと直接タップ</strong>すると、手元から一直線に飛んで激突粉砕！<br>
+      VR機器の場合は「ENTER VR」を押し、<strong class="text-amber-300">ピンチ（つまむ）動作</strong>で投げられます。
     </p>
     <div class="inline-block px-2.5 py-0.5 rounded-full bg-white/10 text-[10px] text-amber-200 font-semibold border border-white/10">
       画面タップで即プレイ開始
     </div>
   </div>
 
+  <!-- Toast notification -->
   <div id="toast-notify" class="absolute bottom-6 left-1/2 -translate-x-1/2 glass-card px-4 py-1.5 rounded-xl text-xs text-amber-300 opacity-0 transition-opacity duration-300 pointer-events-none z-30 font-semibold shadow-xl">
     新しい植木鉢を構えました！
   </div>
@@ -314,14 +325,19 @@
     let wallImpactDecals = [];
     let speedLinesActive = false;
 
+    // 特殊ポット & 3連乱射ステート
     let isShotgunMode = false;
     const potTypesList = ['terracotta', 'glazed', 'porcelain', 'concrete', 'dynamite', 'crystal', 'magma'];
 
+    // IMPACT POLISH: Hit-stop & Shockwaves
     let hitStopTimer = 0;             
     let shockwaves = [];              
+
+    // DESTRUCTION TARGET: Collapsible Wooden Crate Pyramid Tower
     let towerBlocks = [];             
     let crateTexture = null;
 
+    // Raycasting & Aiming System
     let raycaster, mouseNorm;
     let wallAimPlane;
     let wallTargetMarker;
@@ -331,15 +347,16 @@
     // VR Controls & UI
     let controller1, controller2;
     let raycasterVR;
-    let vrUI = []; 
-    const vrControllersData = new Map(); // VRコントローラーの状態と軌跡を保存
+    let vrUI = []; // 3D UI objects for VR
 
+    // Simulation timing & scales
     let isSlowMo = false;
     let timeScale = 1.0;
     let audioEnabled = true;
     let audioCtx = null;
     let activePotType = 'terracotta';
 
+    // Camera Modes
     let cameraMode = 0;
     const cameraConfigs = [
       { label: '投擲手 (FPS)', pos: new THREE.Vector3(0, 0.65, 4.2), target: new THREE.Vector3(0, 0.7, -12.5) },
@@ -352,12 +369,16 @@
     let cameraShake = 0;
     let cameraFovVelocity = 0;
 
+    // Analytics
     let analytics = { smashes: 0, shards: 0, maxSpeed: 0, maxForce: 0 };
+
+    // Environment dimensions
     const ARENA = {
       wallZ: -12.5, floorY: -2.6, sideX: 11.0, ceilY: 10.0,
       readyPos: new THREE.Vector3(0.55, -1.35, 1.1)
     };
 
+    // Interaction handling & anti-duplicate firing state
     let activePointerId = null;
     let isPointerDown = false;
     let pointerDownPos = { x: 0, y: 0, time: 0 };
@@ -758,6 +779,7 @@
       showToast('🗼 ピラミッドタワーを再構築しました！');
     }
 
+    // 外部のCDNに依存しない自作のVRButtonロジック
     const VRButton = {
       createButton: function(renderer) {
         const button = document.createElement('button');
@@ -826,6 +848,7 @@
       scene.background = new THREE.Color(0x08090d);
       scene.fog = new THREE.FogExp2(0x08090d, 0.022);
 
+      // Camera setup with Group for WebXR positioning
       camera = new THREE.PerspectiveCamera(50, w / h, 0.1, 100);
       cameraGroup = new THREE.Group();
       scene.add(cameraGroup);
@@ -839,6 +862,7 @@
       renderer.toneMapping = THREE.ACESFilmicToneMapping;
       renderer.toneMappingExposure = 1.25;
       
+      // Enable WebXR (VR)
       renderer.xr.enabled = true;
       container.appendChild(renderer.domElement);
 
@@ -855,6 +879,7 @@
       buildPyramidTower();
       spawnReadyPot();
       
+      // Setup VR specific additions
       setupVRControllers();
       setupVRUI();
 
@@ -863,6 +888,7 @@
     }
 
     function setupVRUI() {
+      // VR空間内に浮かぶ専用ホログラムUI (左:鉢変更、右:タワーリセット)
       const resetGeo = new THREE.BoxGeometry(1.2, 1.2, 1.2);
       const resetMat = new THREE.MeshStandardMaterial({color: 0xffaa00, emissive: 0x664400, roughness: 0.2, wireframe: true});
       const resetMesh = new THREE.Mesh(resetGeo, resetMat);
@@ -876,11 +902,6 @@
       changeMesh.position.set(-7.5, 4.5, -9); 
       scene.add(changeMesh);
       vrUI.push({ mesh: changeMesh, action: 'change' });
-    }
-
-    function getControllerData(controller) {
-      if (!vrControllersData.has(controller)) vrControllersData.set(controller, { isHolding: false, history: [] });
-      return vrControllersData.get(controller);
     }
 
     function setupVRControllers() {
@@ -901,16 +922,26 @@
                 if (hitUI.action === 'reset') resetTower();
                 else if (hitUI.action === 'change') cyclePotType();
                 playAuthenticImpactAudio(0.5);
-                createTapRippleUI(window.innerWidth/2, window.innerHeight/2); // dummy feedback
+                createTapRippleUI(window.innerWidth/2, window.innerHeight/2);
             }
             return;
         }
 
-        // 2. 物理投擲のための保持開始
+        // 2. 物理投擲のための保持開始（トリガーを引く/つまむ）
         const data = getControllerData(controller);
         data.isHolding = true;
         data.history = [];
-        if (!readyPot || !readyPot.mesh) spawnReadyPot();
+        
+        // 手元に鉢がなければすぐに生成する
+        if (!readyPot || !readyPot.mesh) {
+            spawnReadyPot();
+            readyPot.spawnProgress = 1.0;
+        }
+        
+        // 掴んだ瞬間にVRの手に合うように少し小さめにスケール
+        if (readyPot && readyPot.mesh) {
+            readyPot.mesh.scale.set(0.65, 0.65, 0.65);
+        }
       }
 
       function onSelectEndVR(event) {
@@ -919,17 +950,14 @@
         if (!data.isHolding) return;
         data.isHolding = false;
 
-        // 【投擲フィールの改善】 
-        // 指を離す瞬間のコントローラーのブレ（すっぽ抜け）を防止するため、直近2フレームは捨てる
         const validHistory = data.history.slice(0, Math.max(1, data.history.length - 2));
 
         if (validHistory.length >= 2) {
             const newest = validHistory[validHistory.length - 1];
             let oldest = validHistory[0];
             
-            // 約0.1秒（100ms）前の位置との差分から、安定したスイング速度を計算
             for (let i = validHistory.length - 1; i >= 0; i--) {
-                if (newest.time - validHistory[i].time > 100) {
+                if (newest.time - validHistory[i].time > 80) { // 直近の鋭い振りを取得
                     oldest = validHistory[i];
                     break;
                 }
@@ -938,34 +966,28 @@
             const dt = (newest.time - oldest.time) / 1000;
             
             if (dt > 0.01) {
-                // 1. 腕を振る速度（軌跡からのベクトル）
+                // 腕を振る速度（軌跡からのベクトル）のみをシンプルに使い、曲がりを防止
                 const swingVelocity = new THREE.Vector3().subVectors(newest.pos, oldest.pos).divideScalar(dt);
                 
-                // 2. コントローラーの向き（手首のスナップ、押し出し方向）
-                const tempMatrix = new THREE.Matrix4().makeRotationFromQuaternion(newest.rot);
-                const forwardDir = new THREE.Vector3(0, 0, -1).applyMatrix4(tempMatrix);
-                
-                // --- 調整パラメーター ---
-                const swingMultiplier = 3.5; // 腕の振りの威力を何倍にするか
-                const forwardAssist = 5.0;   // コントローラが向いている方向への押し出し力（エイム補正）
-                const upwardAssist = 1.4;    // 重力で落ちすぎないための上方向アシスト
-                
+                // 威力を強める
+                const swingMultiplier = 4.5; 
                 const finalVelocity = swingVelocity.multiplyScalar(swingMultiplier);
-                finalVelocity.addScaledVector(forwardDir, forwardAssist);
-                finalVelocity.y += upwardAssist;
                 
-                // 一定以上のスピードがあれば投げる
-                if (finalVelocity.length() > 3.0) {
+                // 遊びやすさのための補正（重力負け防止、横ブレ抑制、直進推進力強化）
+                finalVelocity.y += 1.8; 
+                finalVelocity.x *= 0.8; 
+                finalVelocity.z *= 1.2; 
+                
+                if (finalVelocity.length() > 2.0) { // 軽く振っても飛ぶように
                     launchPotWithPhysics(newest.pos, finalVelocity);
                 } else if (readyPot && readyPot.mesh) {
-                    // 弱すぎる場合は元の位置に戻す
                     readyPot.mesh.position.copy(ARENA.readyPos);
-                    readyPot.mesh.scale.set(0.1, 0.1, 0.1);
+                    readyPot.mesh.scale.set(1.0, 1.0, 1.0);
                 }
             }
         } else if (readyPot && readyPot.mesh) {
             readyPot.mesh.position.copy(ARENA.readyPos);
-            readyPot.mesh.scale.set(0.1, 0.1, 0.1);
+            readyPot.mesh.scale.set(1.0, 1.0, 1.0);
         }
       }
 
@@ -991,6 +1013,40 @@
 
       controller1.add(line.clone());
       controller2.add(line.clone());
+      
+      // データ格納用
+      controller1.userData = { isHolding: false, history: [] };
+      controller2.userData = { isHolding: false, history: [] };
+    }
+
+    function getControllerData(controller) {
+        return controller.userData;
+    }
+
+    function launchPotWithPhysics(pos, velocity) {
+        let potToThrow = readyPot;
+        if (!potToThrow || !potToThrow.mesh) return;
+
+        // 投げる瞬間に元のスケールに戻す
+        potToThrow.mesh.scale.set(1.0, 1.0, 1.0);
+        
+        flyingPots.push({
+            mesh: potToThrow.mesh, 
+            bodyMat: potToThrow.bodyMat, 
+            soilMat: potToThrow.soilMat, 
+            leafMat: potToThrow.leafMat,
+            potType: potToThrow.potType || activePotType, 
+            velocity: velocity.clone(),
+            angularVel: new THREE.Vector3((Math.random() - 0.5) * 6 + 9, (Math.random() - 0.5) * 10, -velocity.z * 0.35), 
+            trailTimer: 0
+        });
+        
+        readyPot = null;
+        showSpeedLines(); 
+        playThrowWhooshAudio(Math.abs(velocity.z) / 18.0); 
+        
+        // 連続投擲のためにすぐに手元にスポーンさせる
+        scheduleAutoRespawn(150);
     }
 
     function updateVRControllers() {
@@ -1026,22 +1082,20 @@
           const line = controller.getObjectByName('line');
           if (line) line.scale.z = hitDist;
 
-          // 保持中の植木鉢を手に追従させ、速度計算用の履歴を保存
           const data = getControllerData(controller);
           if (data && data.isHolding) {
               const currentPos = new THREE.Vector3().setFromMatrixPosition(controller.matrixWorld);
               const currentRot = new THREE.Quaternion().setFromRotationMatrix(controller.matrixWorld);
               data.history.push({ pos: currentPos.clone(), rot: currentRot.clone(), time: now });
               
-              // 過去20フレーム（少し長め）を保持して安定した速度計算に使用
-              if (data.history.length > 20) data.history.shift(); 
+              if (data.history.length > 15) data.history.shift(); 
               
               if (readyPot && readyPot.mesh) {
-                  // 植木鉢をコントローラー（手）の位置にスナップさせる
                   readyPot.mesh.position.copy(currentPos);
                   readyPot.mesh.quaternion.copy(currentRot);
                   readyPot.spawnProgress = 1.0;
-                  readyPot.mesh.scale.set(1, 1, 1);
+                  // 手に持っている時は少し小さく見せる
+                  readyPot.mesh.scale.set(0.65, 0.65, 0.65);
               }
           }
         }
@@ -1247,7 +1301,7 @@
       return readyPot;
     }
 
-    function scheduleAutoRespawn(delayMs = 280) {
+    function scheduleAutoRespawn(delayMs = 150) { // 連続投擲のためにスポーンを早く
       if (autoRespawnTimeout) clearTimeout(autoRespawnTimeout);
       autoRespawnTimeout = setTimeout(() => { spawnReadyPot(); }, delayMs);
     }
@@ -1418,7 +1472,9 @@
 
       if (readyPot && readyPot.mesh && readyPot.spawnProgress < 1.0) {
         readyPot.spawnProgress = Math.min(1.0, readyPot.spawnProgress + effDt * 7.0);
-        const s = Math.sin(readyPot.spawnProgress * Math.PI * 0.5); readyPot.mesh.scale.set(s, s, s);
+        const s = Math.sin(readyPot.spawnProgress * Math.PI * 0.5); 
+        // 掴まれていない状態では少し小さめにポップ
+        if (readyPot.mesh.scale.x < 1.0) readyPot.mesh.scale.set(s * 0.8, s * 0.8, s * 0.8);
       }
 
       for (let p = flyingPots.length - 1; p >= 0; p--) {
@@ -1527,7 +1583,7 @@
     }
 
     function updateCameraMotion(dt) {
-      if (renderer.xr.isPresenting) return; // VR時はカメラを揺らさない（VR酔い防止）
+      if (renderer && renderer.xr && renderer.xr.isPresenting) return; // VR時はカメラを揺らさない
 
       if (cameraShake > 0.001) {
         cameraOffset.x = (Math.random() - 0.5) * cameraShake;
@@ -1675,36 +1731,8 @@
         angularVel: new THREE.Vector3((Math.random() - 0.5) * 6 + 9, (Math.random() - 0.5) * 10, -vx * 0.35), trailTimer: 0
       });
       readyPot = null;
-      if (cameraMode === 0 && !renderer.xr.isPresenting) { camera.fov = 62; cameraFovVelocity = 24; camera.updateProjectionMatrix(); }
+      if (cameraMode === 0 && (!renderer.xr || !renderer.xr.isPresenting)) { camera.fov = 62; cameraFovVelocity = 24; camera.updateProjectionMatrix(); }
       showSpeedLines(); playThrowWhooshAudio(Math.abs(vz) / 18.0); scheduleAutoRespawn(260);
-    }
-    
-    function launchPotWithPhysics(origin, velocityVec) {
-      let potToThrow = readyPot; 
-      if (!potToThrow || !potToThrow.mesh) potToThrow = spawnReadyPot();
-      
-      potToThrow.mesh.scale.set(1.0, 1.0, 1.0);
-      potToThrow.mesh.position.copy(origin);
-      
-      flyingPots.push({
-        mesh: potToThrow.mesh, bodyMat: potToThrow.bodyMat, soilMat: potToThrow.soilMat, leafMat: potToThrow.leafMat,
-        potType: potToThrow.potType || activePotType, velocity: velocityVec.clone(),
-        angularVel: new THREE.Vector3((Math.random() - 0.5) * 6 + 9, (Math.random() - 0.5) * 10, -velocityVec.z * 0.35), trailTimer: 0
-      });
-      readyPot = null;
-      
-      if (isShotgunMode) {
-          [new THREE.Vector3(velocityVec.x - 2.4, velocityVec.y, velocityVec.z), new THREE.Vector3(velocityVec.x + 2.4, velocityVec.y, velocityVec.z)].forEach((spreadVel, idx) => { 
-              setTimeout(() => {
-                  const extraPot = buildPotModel(activePotType); extraPot.group.position.copy(origin); scene.add(extraPot.group);
-                  flyingPots.push({ mesh: extraPot.group, bodyMat: extraPot.bodyMat, soilMat: extraPot.soilMat, leafMat: extraPot.leafMat, potType: extraPot.potType, velocity: spreadVel, angularVel: new THREE.Vector3((Math.random() - 0.5) * 6, (Math.random() - 0.5) * 10, -spreadVel.z * 0.3), trailTimer: 0 });
-              }, 40 * (idx + 1)); 
-          });
-      }
-
-      showSpeedLines(); 
-      playThrowWhooshAudio(Math.min(velocityVec.length() / 15.0, 2.0)); 
-      scheduleAutoRespawn(260);
     }
 
     function toggleShotgunMode() {
@@ -1726,7 +1754,7 @@
       const cfg = cameraConfigs[cameraMode];
       baseCameraPos.copy(cfg.pos);
       if (renderer && renderer.xr && renderer.xr.isPresenting) {
-        cameraGroup.position.copy(baseCameraPos); 
+        cameraGroup.position.copy(baseCameraPos);
       } else {
         camera.position.copy(baseCameraPos);
         camera.lookAt(cfg.target);
