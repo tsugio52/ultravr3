@@ -265,7 +265,6 @@
       </button>
     </div>
 
-    <!-- 下段：アクション投擲 -->
     <div class="flex flex-col gap-2 pointer-events-auto" onpointerdown="event.stopPropagation()">
       <button id="shotgun-toggle-btn" onclick="toggleShotgunMode()" class="glass-btn w-14 h-12 rounded-2xl flex flex-col items-center justify-center text-slate-200 border border-purple-400/40 hover:text-white shadow-lg" title="3連ショットガン射出">
         <i class="fa-solid fa-burst text-purple-400 text-sm"></i>
@@ -758,7 +757,6 @@
     function setupVRControllers() {
       raycasterVR = new THREE.Raycaster();
 
-      // トリガー(ピンチ)はUIのクリックにのみ使用します
       function onSelectStartVR(event) {
         const controller = event.target;
         const tempMatrix = new THREE.Matrix4();
@@ -826,8 +824,7 @@
         }
       });
 
-      // 2. 完全自動ジェスチャー投擲ロジック
-      // 優先的に右手（無い場合は見えている手）を投擲手に設定
+      // 2. 自動ジェスチャー投擲ロジック
       let targetController = null;
       if (controller2 && controller2.userData.handedness === 'right' && controller2.visible) targetController = controller2;
       else if (controller1 && controller1.userData.handedness === 'right' && controller1.visible) targetController = controller1;
@@ -839,44 +836,57 @@
           const currentRot = new THREE.Quaternion().setFromRotationMatrix(targetController.matrixWorld);
           const data = targetController.userData;
 
-          // 速度（Velocity）の計算
           if (!data.lastPos) data.lastPos = currentPos.clone();
           const rawVel = new THREE.Vector3().subVectors(currentPos, data.lastPos).divideScalar(dt || 0.016);
           data.lastPos.copy(currentPos);
 
           if (!data.vel) data.vel = new THREE.Vector3();
-          data.vel.lerp(rawVel, 0.45); // なめらかに補間（少しレスポンス良く）
+          data.vel.lerp(rawVel, 0.45); 
 
-          // 発射判定: 前方(-Z方向)に向かって手が動いた場合
-          // 閾値を少し下げて、より軽い振りでも反応するように
-          const isForwardThrust = data.vel.z < -1.0 && data.vel.length() > 1.5;
+          // 手の「前方向」を基準にする。
+          // Quest 3Sで体の向きを変えても、「手を前へ突き出す」動作になる。
+          const handForward = new THREE.Vector3(0, 0, -1).applyQuaternion(currentRot).normalize();
+          const forwardSpeed = data.vel.dot(handForward);
+          const lateralSpeed = data.vel.clone().sub(
+              handForward.clone().multiplyScalar(forwardSpeed)
+          ).length();
+
+          // 前方向へ十分に突き出した時だけ投擲。
+          // 横方向の動きだけでは誤発射しない。
+          const isForwardThrust =
+              forwardSpeed > 1.15 &&
+              data.vel.length() > 1.35 &&
+              forwardSpeed > lateralSpeed * 1.15;
 
           if (vrThrowCooldown <= 0 && isForwardThrust && readyPot && readyPot.mesh) {
-              // 投げる！
-              const throwVel = data.vel.clone();
-              
-              // 【遠くにスムーズに飛ばすための強力なアシスト補正】
-              throwVel.multiplyScalar(2.8); // 全体的な速度を大幅アップ（2.8倍）
-              throwVel.z *= 1.6; // 前方(Z方向)への勢いをさらに強くブースト
-              throwVel.y += 3.8; // 上向きの推進力を強くし、重力ですぐ落ちないようにする
-              throwVel.x *= 0.3; // 横ブレをさらに抑えて真っ直ぐ飛ばす
+              // 実際の手の移動速度を主体にした自然な投擲。
+              // 上方向への強制補正は入れず、手を出した方向へ飛ばす。
+              const throwSpeed = THREE.MathUtils.clamp(
+                  forwardSpeed * 2.35,
+                  5.5,
+                  15.0
+              );
+              const throwVel = handForward.clone().multiplyScalar(throwSpeed);
 
-              // 最小速度の保証（軽く振っても壁・タワーまで気持ちよく届くように）
-              if (throwVel.z > -14.0) throwVel.z = -14.0;
+              // 手が少し上下に動いた場合だけ、その成分を少し残す。
+              throwVel.y += data.vel.y * 0.22;
 
               launchPotWithPhysics(currentPos, throwVel);
-              vrThrowCooldown = 0.3; // 次の鉢が出るまでのクールダウンを少し短縮(0.3秒)
-          } 
+              vrThrowCooldown = 0.38;
+              data.lastThrowForward = handForward.clone();
+          }
           else if (vrThrowCooldown <= 0) {
-              // 投げていない時は、常に手元に鉢を追従させる
               if (!readyPot || !readyPot.mesh) spawnReadyPot();
-              
+
               if (readyPot && readyPot.mesh) {
-                  // ドアップにならないよう、手のひらの少し先（奥）かつ下にオフセットを配置
-                  const offset = new THREE.Vector3(0, -0.12, -0.22).applyQuaternion(currentRot);
+                  // 手のひらの少し前・少し下に鉢を保持する。
+                  // 実物の小型植木鉢に近いサイズ感。
+                  const offset = new THREE.Vector3(0, -0.08, -0.13).applyQuaternion(currentRot);
                   readyPot.mesh.position.copy(currentPos).add(offset);
                   readyPot.mesh.quaternion.copy(currentRot);
-                  readyPot.mesh.scale.set(0.5, 0.5, 0.5); // 全体が見えるようにスケールを少し縮小
+
+                  // VRで持っている時のサイズ：従来の0.25 → 0.16
+                  readyPot.mesh.scale.set(0.16, 0.16, 0.16);
                   readyPot.spawnProgress = 1.0;
               }
           }
@@ -1063,11 +1073,14 @@
       hideSpeedLines();
       if (impactPos.z <= ARENA.wallZ + 0.7) addWallImpactDecal(impactPos.x, impactPos.y);
 
+      // ★ 破片や土のサイズにも鉢のスケールを乗算して反映
+      const potScale = flyingObj.scaleMultiplier || 1.0; 
       const shardMultiplier = (pType === 'crystal') ? 3.0 : (pType === 'magma' ? 1.4 : 1.0);
       const baseCount = Math.floor(6 * shardMultiplier);
+      
       for (let b = 0; b < baseCount; b++) {
-        const baseSize = 0.28 + Math.random() * 0.18;
-        const baseMesh = new THREE.Mesh(new THREE.CylinderGeometry(baseSize, baseSize * 1.1, 0.09, 5), flyingObj.bodyMat);
+        const baseSize = (0.28 + Math.random() * 0.18) * potScale;
+        const baseMesh = new THREE.Mesh(new THREE.CylinderGeometry(baseSize, baseSize * 1.1, 0.09 * potScale, 5), flyingObj.bodyMat);
         baseMesh.castShadow = true; baseMesh.position.copy(impactPos).add(new THREE.Vector3((Math.random() - 0.5) * 0.4, (Math.random() - 0.5) * 0.4, 0.1));
         baseMesh.rotation.set(Math.random() * Math.PI, Math.random() * Math.PI, 0);
         const burstAngle = Math.random() * Math.PI * 2, bForce = (Math.random() * 0.6 + 0.5) * hitSpeed * (pType === 'dynamite' ? 0.9 : 0.4);
@@ -1077,7 +1090,7 @@
 
       const shardCount = Math.floor(45 * shardMultiplier); analytics.shards += shardCount;
       for (let i = 0; i < shardCount; i++) {
-        const sSize = 0.12 + Math.random() * 0.2;
+        const sSize = (0.12 + Math.random() * 0.2) * potScale;
         const shardMesh = new THREE.Mesh(new THREE.ConeGeometry(sSize, sSize * 1.6, 3 + Math.floor(Math.random() * 3)), flyingObj.bodyMat);
         shardMesh.castShadow = true; shardMesh.receiveShadow = true; shardMesh.position.copy(impactPos).add(new THREE.Vector3((Math.random() - 0.5) * 0.45, (Math.random() - 0.5) * 0.45, (Math.random() - 0.5) * 0.2));
         const burstAngle = Math.random() * Math.PI * 2, burstStr = (Math.random() * 0.7 + 0.4) * hitSpeed * (pType === 'dynamite' ? 1.2 : 0.6);
@@ -1085,13 +1098,13 @@
         scene.add(shardMesh);
       }
 
-      const rootBallMesh = new THREE.Mesh(new THREE.DodecahedronGeometry(0.32, 1), flyingObj.soilMat);
+      const rootBallMesh = new THREE.Mesh(new THREE.DodecahedronGeometry(0.32 * potScale, 1), flyingObj.soilMat);
       rootBallMesh.position.copy(impactPos).add(new THREE.Vector3(0, 0, 0.15)); rootBallMesh.castShadow = true;
       rootBallDebris.push({ mesh: rootBallMesh, vel: new THREE.Vector3(impactVel.x * 0.2, 1.8, Math.abs(impactVel.z) * 0.22), angVel: new THREE.Vector3((Math.random() - 0.5) * 6, (Math.random() - 0.5) * 6, 0), isResting: false });
       scene.add(rootBallMesh);
 
       for (let s = 0; s < 80; s++) {
-        const soilMesh = new THREE.Mesh(new THREE.DodecahedronGeometry(0.045 + Math.random() * 0.065, 0), flyingObj.soilMat);
+        const soilMesh = new THREE.Mesh(new THREE.DodecahedronGeometry((0.045 + Math.random() * 0.065) * potScale, 0), flyingObj.soilMat);
         soilMesh.castShadow = true; soilMesh.position.copy(impactPos).add(new THREE.Vector3((Math.random() - 0.5) * 0.5, (Math.random() - 0.5) * 0.5, (Math.random() - 0.5) * 0.3));
         const ang = Math.random() * Math.PI * 2, force = (Math.random() * 0.7 + 0.3) * hitSpeed * (pType === 'dynamite' ? 0.9 : 0.45);
         soilParticles.push({ mesh: soilMesh, vel: new THREE.Vector3(Math.cos(ang) * force, Math.sin(ang) * force * 0.8 + Math.random() * 2.5, Math.abs(impactVel.z) * (0.2 + Math.random() * 0.3)), angVel: new THREE.Vector3((Math.random() - 0.5) * 15, (Math.random() - 0.5) * 15, 0), isResting: false });
@@ -1099,21 +1112,21 @@
       }
 
       for (let f = 0; f < 9; f++) {
-        const leafMesh = new THREE.Mesh(new THREE.PlaneGeometry(0.32, 0.5), flyingObj.leafMat);
+        const leafMesh = new THREE.Mesh(new THREE.PlaneGeometry(0.32 * potScale, 0.5 * potScale), flyingObj.leafMat);
         leafMesh.position.copy(impactPos).add(new THREE.Vector3((Math.random() - 0.5) * 0.6, (Math.random() - 0.5) * 0.6, 0.1)); leafMesh.castShadow = true;
         foliagePieces.push({ mesh: leafMesh, vel: new THREE.Vector3((Math.random() - 0.5) * 5, Math.random() * 3 + 1.2, Math.abs(impactVel.z) * 0.25 + Math.random() * 2), angVel: new THREE.Vector3((Math.random() - 0.5) * 14, (Math.random() - 0.5) * 14, (Math.random() - 0.5) * 14), flutter: Math.random() * Math.PI * 2 });
         scene.add(leafMesh);
       }
-      spawnDustExplosion(impactPos);
+      spawnDustExplosion(impactPos, potScale);
     }
 
-    function spawnDustExplosion(pos) {
-      const dustGeo = new THREE.PlaneGeometry(1.1, 1.1), dustMat = new THREE.MeshBasicMaterial({ color: activePotType === 'glazed' ? 0x82c8ce : (activePotType === 'porcelain' ? 0xe5eaf2 : 0xd29882), transparent: true, opacity: 0.55, depthWrite: false });
+    function spawnDustExplosion(pos, potScale = 1.0) {
+      const dustGeo = new THREE.PlaneGeometry(1.1 * potScale, 1.1 * potScale), dustMat = new THREE.MeshBasicMaterial({ color: activePotType === 'glazed' ? 0x82c8ce : (activePotType === 'porcelain' ? 0xe5eaf2 : 0xd29882), transparent: true, opacity: 0.55, depthWrite: false });
       for (let d = 0; d < 20; d++) {
         const dust = new THREE.Mesh(dustGeo, dustMat.clone());
         dust.position.copy(pos).add(new THREE.Vector3((Math.random() - 0.5) * 0.5, (Math.random() - 0.5) * 0.5, (Math.random() - 0.5) * 0.25));
         dust.rotation.z = Math.random() * Math.PI * 2;
-        dustClouds.push({ mesh: dust, vel: new THREE.Vector3((Math.random() - 0.5) * 2.8, (Math.random() * 2.0 + 0.4), Math.random() * 2.5), scaleRate: 2.0 + Math.random() * 2.0, opacity: 0.65 });
+        dustClouds.push({ mesh: dust, vel: new THREE.Vector3((Math.random() - 0.5) * 2.8, (Math.random() * 2.0 + 0.4), Math.random() * 2.5), scaleRate: (2.0 + Math.random() * 2.0) * potScale, opacity: 0.65 });
         scene.add(dust);
       }
     }
@@ -1141,7 +1154,6 @@
 
       for (let p = flyingPots.length - 1; p >= 0; p--) {
         const fp = flyingPots[p];
-        if (fp.mesh.scale.x < 1.0) fp.mesh.scale.set(1.0, 1.0, 1.0);
         fp.velocity.y += GRAVITY * effDt; fp.mesh.position.addScaledVector(fp.velocity, effDt);
         fp.mesh.rotation.x += fp.angularVel.x * effDt; fp.mesh.rotation.y += fp.angularVel.y * effDt; fp.mesh.rotation.z += fp.angularVel.z * effDt;
 
@@ -1374,7 +1386,8 @@
       flyingPots.push({
         mesh: potToThrow.mesh, bodyMat: potToThrow.bodyMat, soilMat: potToThrow.soilMat, leafMat: potToThrow.leafMat,
         potType: potToThrow.potType || activePotType, velocity: new THREE.Vector3(vx, vy, vz),
-        angularVel: new THREE.Vector3((Math.random() - 0.5) * 6 + 9, (Math.random() - 0.5) * 10, -vx * 0.35), trailTimer: 0
+        angularVel: new THREE.Vector3((Math.random() - 0.5) * 6 + 9, (Math.random() - 0.5) * 10, -vx * 0.35), trailTimer: 0,
+        scaleMultiplier: 1.0 // ブラウザ投球では1.0倍
       });
       readyPot = null;
       if (cameraMode === 0 && !renderer.xr.isPresenting) { camera.fov = 62; cameraFovVelocity = 24; camera.updateProjectionMatrix(); }
@@ -1384,12 +1397,22 @@
     function launchPotWithPhysics(pos, velocity) {
         let potToThrow = readyPot;
         if (!potToThrow || !potToThrow.mesh) return;
-        potToThrow.mesh.scale.set(1.0, 1.0, 1.0); // スケールを通常に戻す
+        
+        // 手に持っていた実寸感を、そのまま投げた後も維持する。
+        // 投げた瞬間だけ巨大化しない。
+        const vrPotScale = 0.16;
+        potToThrow.mesh.scale.set(vrPotScale, vrPotScale, vrPotScale);
 
         flyingPots.push({
             mesh: potToThrow.mesh, bodyMat: potToThrow.bodyMat, soilMat: potToThrow.soilMat, leafMat: potToThrow.leafMat,
             potType: potToThrow.potType || activePotType, velocity: velocity.clone(),
-            angularVel: new THREE.Vector3((Math.random() - 0.5) * 6 + 9, (Math.random() - 0.5) * 10, -velocity.z * 0.35), trailTimer: 0
+            angularVel: new THREE.Vector3(
+                (Math.random() - 0.5) * 4 + 6,
+                (Math.random() - 0.5) * 7,
+                -velocity.z * 0.22
+            ),
+            trailTimer: 0,
+            scaleMultiplier: vrPotScale
         });
         readyPot = null; showSpeedLines(); playThrowWhooshAudio(Math.abs(velocity.z) / 18.0);
     }
