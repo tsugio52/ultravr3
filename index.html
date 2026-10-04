@@ -872,11 +872,11 @@
               if (!readyPot || !readyPot.mesh) spawnReadyPot();
               
               if (readyPot && readyPot.mesh) {
-                  // 手のひらの中に自然に収まるように少しオフセットする
-                  const offset = new THREE.Vector3(0, -0.05, -0.08).applyQuaternion(currentRot);
+                  // ドアップにならないよう、手のひらの少し先（奥）かつ下にオフセットを配置
+                  const offset = new THREE.Vector3(0, -0.12, -0.22).applyQuaternion(currentRot);
                   readyPot.mesh.position.copy(currentPos).add(offset);
                   readyPot.mesh.quaternion.copy(currentRot);
-                  readyPot.mesh.scale.set(0.65, 0.65, 0.65); // 持ちやすいサイズに縮小
+                  readyPot.mesh.scale.set(0.5, 0.5, 0.5); // 全体が見えるようにスケールを少し縮小
                   readyPot.spawnProgress = 1.0;
               }
           }
