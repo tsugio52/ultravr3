@@ -174,7 +174,7 @@
     <circle id="aim-target" cx="0" cy="0" r="14" fill="rgba(249, 115, 22, 0.3)" stroke="#fb923c" stroke-width="2.5" />
   </svg>
 
-  <!-- 🎯 極小ミニマルヘッダー（左上＆右上）：中央は完全に素通し -->
+  <!-- 極小ミニマルヘッダー -->
   <div class="absolute top-2 left-2 pointer-events-none z-20 flex items-center space-x-2">
     <div class="glass-card rounded-xl px-2.5 py-1 flex items-center space-x-1.5 pointer-events-auto">
       <div class="w-5 h-5 rounded-md bg-gradient-to-br from-amber-500 to-rose-600 flex items-center justify-center text-white text-xs">
@@ -185,7 +185,7 @@
     </div>
   </div>
 
-  <!-- 右上：ミニテレメトリーステータス（撃破数・球速） -->
+  <!-- テレメトリーステータス -->
   <div class="absolute top-2 right-2 pointer-events-none z-20 flex items-center space-x-1.5">
     <div class="glass-card rounded-xl px-2 py-1 pointer-events-auto flex items-center space-x-1.5 text-[11px]">
       <span class="text-slate-400 font-bold">撃破:</span>
@@ -197,7 +197,7 @@
     </div>
   </div>
 
-  <!-- 👈 左側縦型ドック：植木鉢パレット（上下中央配置・左手親指で操作） -->
+  <!-- 👈 左側縦型ドック：植木鉢パレット -->
   <div class="absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none z-20 flex flex-col items-center">
     <div class="glass-card rounded-2xl p-1.5 flex flex-col gap-1.5 pointer-events-auto max-h-[82vh] overflow-y-auto no-scrollbar shadow-2xl" onpointerdown="event.stopPropagation()">
       <div class="text-[9px] font-black text-slate-400 text-center tracking-widest uppercase mb-0.5">鉢素材</div>
@@ -242,10 +242,8 @@
     </div>
   </div>
 
-  <!-- 👉 右側縦型ドック：ユーティリティ ＆ アクション（右手親指で操作） -->
+  <!-- 👉 右側縦型ドック：ユーティリティ -->
   <div class="absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none z-20 flex flex-col items-end gap-2.5">
-    
-    <!-- 上段：ユーティリティ縦バー（タワー再建・カメラ・スロー・清掃など） -->
     <div class="glass-card rounded-2xl p-1.5 flex flex-col gap-1.5 pointer-events-auto shadow-xl" onpointerdown="event.stopPropagation()">
       <button onclick="resetTower()" class="glass-btn w-11 h-10 rounded-xl flex items-center justify-center text-amber-300 hover:bg-amber-500/20" title="ピラミッドタワーを再構築">
         <i class="fa-solid fa-cubes-stacked text-sm"></i>
@@ -267,7 +265,7 @@
       </button>
     </div>
 
-    <!-- 下段：アクション投擲（3連射 ＆ 全力投球）右手親指のベストポジション -->
+    <!-- 下段：アクション投擲 -->
     <div class="flex flex-col gap-2 pointer-events-auto" onpointerdown="event.stopPropagation()">
       <button id="shotgun-toggle-btn" onclick="toggleShotgunMode()" class="glass-btn w-14 h-12 rounded-2xl flex flex-col items-center justify-center text-slate-200 border border-purple-400/40 hover:text-white shadow-lg" title="3連ショットガン射出">
         <i class="fa-solid fa-burst text-purple-400 text-sm"></i>
@@ -297,13 +295,13 @@
     <div class="w-12 h-12 mx-auto rounded-2xl bg-gradient-to-tr from-orange-600 to-amber-500 text-white flex items-center justify-center text-2xl mb-2.5 shadow-lg shadow-orange-500/40 animate-pulse">
       <i class="fa-solid fa-bullseye"></i>
     </div>
-    <h2 class="text-base font-black text-white mb-1">壁やタワーを直接タップ！</h2>
+    <h2 class="text-base font-black text-white mb-1">直感プレイ対応！</h2>
     <p class="text-[11px] text-slate-300 leading-relaxed mb-3">
-      壊したい場所を<strong class="text-amber-300">ポンと直接タップ</strong>すると、手元から一直線に飛んで激突粉砕！<br>
-      VR機器の場合は「ENTER VR」を押し、<strong class="text-amber-300">ピンチ（つまむ）動作</strong>で投げられます。
+      【ブラウザ】壊したい場所を画面タップで発射！<br>
+      【VRモード】右手に最初から鉢を持っています。<strong class="text-amber-300">手を前に突き出すだけ</strong>で、そのまま投擲できます！
     </p>
     <div class="inline-block px-2.5 py-0.5 rounded-full bg-white/10 text-[10px] text-amber-200 font-semibold border border-white/10">
-      画面タップで即プレイ開始
+      画面タップで開始
     </div>
   </div>
 
@@ -344,10 +342,11 @@
     let currentAimTarget = new THREE.Vector3(0, 1.2, -12.5);
     let autoRespawnTimeout = null;
 
-    // VR Controls & UI
+    // VR Controls
     let controller1, controller2;
     let raycasterVR;
-    let vrUI = []; // 3D UI objects for VR
+    let vrUI = []; 
+    let vrThrowCooldown = 0; // VR用の投擲クールダウン
 
     // Simulation timing & scales
     let isSlowMo = false;
@@ -378,7 +377,7 @@
       readyPos: new THREE.Vector3(0.55, -1.35, 1.1)
     };
 
-    // Interaction handling & anti-duplicate firing state
+    // Interaction handling for Browser
     let activePointerId = null;
     let isPointerDown = false;
     let pointerDownPos = { x: 0, y: 0, time: 0 };
@@ -437,7 +436,6 @@
       const ctx = getAudioContext();
       if (!ctx) return;
       const now = ctx.currentTime;
-
       const boomOsc = ctx.createOscillator();
       const boomGain = ctx.createGain();
       boomOsc.type = 'sine';
@@ -449,24 +447,6 @@
       boomGain.connect(ctx.destination);
       boomOsc.start(now);
       boomOsc.stop(now + 0.65);
-
-      const nLen = Math.floor(ctx.sampleRate * 0.6);
-      const nBuf = ctx.createBuffer(1, nLen, ctx.sampleRate);
-      const d = nBuf.getChannelData(0);
-      for (let i = 0; i < nLen; i++) d[i] = (Math.random() * 2 - 1) * Math.exp(-i / (ctx.sampleRate * 0.12));
-      const nSrc = ctx.createBufferSource();
-      nSrc.buffer = nBuf;
-      const f = ctx.createBiquadFilter();
-      f.type = 'lowpass';
-      f.frequency.setValueAtTime(1800, now);
-      f.frequency.exponentialRampToValueAtTime(180, now + 0.5);
-      const ng = ctx.createGain();
-      ng.gain.setValueAtTime(1.4, now);
-      ng.gain.exponentialRampToValueAtTime(0.001, now + 0.55);
-      nSrc.connect(f);
-      f.connect(ng);
-      ng.connect(ctx.destination);
-      nSrc.start(now);
     }
 
     function playCrystalShatterAudio() {
@@ -514,7 +494,6 @@
       if (!ctx) return;
       const now = ctx.currentTime;
       const f = Math.min(Math.max(force, 0.4), 2.2);
-
       const thudOsc = ctx.createOscillator();
       const thudGain = ctx.createGain();
       thudOsc.type = 'triangle';
@@ -533,7 +512,6 @@
       const ctx = getAudioContext();
       if (!ctx) return;
       const now = ctx.currentTime;
-
       const dur = 0.32;
       const bufLen = Math.floor(ctx.sampleRate * dur);
       const buffer = ctx.createBuffer(1, bufLen, ctx.sampleRate);
@@ -541,18 +519,15 @@
       for (let i = 0; i < bufLen; i++) data[i] = (Math.random() * 2 - 1) * Math.sin((i / bufLen) * Math.PI);
       const noise = ctx.createBufferSource();
       noise.buffer = buffer;
-
       const filter = ctx.createBiquadFilter();
       filter.type = 'lowpass';
       filter.frequency.setValueAtTime(280, now);
       filter.frequency.linearRampToValueAtTime(1550 * Math.max(power, 0.8), now + 0.12);
       filter.frequency.exponentialRampToValueAtTime(200, now + dur);
-
       const gain = ctx.createGain();
       gain.gain.setValueAtTime(0.01, now);
       gain.gain.linearRampToValueAtTime(0.6 * Math.min(power, 2.0), now + 0.1);
       gain.gain.exponentialRampToValueAtTime(0.001, now + dur);
-
       noise.connect(filter);
       filter.connect(gain);
       gain.connect(ctx.destination);
@@ -561,8 +536,7 @@
 
     function createProceduralCanvas(w, h, drawFn) {
       const c = document.createElement('canvas');
-      c.width = w;
-      c.height = h;
+      c.width = w; c.height = h;
       const ctx = c.getContext('2d');
       drawFn(ctx, w, h);
       return c;
@@ -570,17 +544,12 @@
 
     function generateWallTexture() {
       const canvas = createProceduralCanvas(1024, 1024, (ctx, w, h) => {
-        ctx.fillStyle = '#1e2126';
-        ctx.fillRect(0, 0, w, h);
-        const rows = 18;
-        const cols = 9;
-        const rH = h / rows;
-        const cW = w / cols;
+        ctx.fillStyle = '#1e2126'; ctx.fillRect(0, 0, w, h);
+        const rows = 18, cols = 9, rH = h / rows, cW = w / cols;
         for (let r = 0; r < rows; r++) {
           const off = (r % 2) * (cW * 0.5);
           for (let c = -1; c < cols + 1; c++) {
-            const bx = c * cW + off;
-            const by = r * rH;
+            const bx = c * cW + off, by = r * rH;
             const lum = 32 + Math.floor(Math.random() * 24);
             ctx.fillStyle = `hsl(215, 10%, ${lum}%)`;
             ctx.fillRect(bx + 3, by + 3, cW - 6, rH - 6);
@@ -590,49 +559,38 @@
             }
           }
         }
-        ctx.strokeStyle = '#0e1014';
-        ctx.lineWidth = 4;
+        ctx.strokeStyle = '#0e1014'; ctx.lineWidth = 4;
         for (let r = 0; r <= rows; r++) {
-          ctx.beginPath();
-          ctx.moveTo(0, r * rH);
-          ctx.lineTo(w, r * rH);
-          ctx.stroke();
+          ctx.beginPath(); ctx.moveTo(0, r * rH); ctx.lineTo(w, r * rH); ctx.stroke();
         }
       });
       const tex = new THREE.CanvasTexture(canvas);
-      tex.wrapS = THREE.RepeatWrapping;
-      tex.wrapT = THREE.RepeatWrapping;
-      tex.repeat.set(2, 2);
+      tex.wrapS = THREE.RepeatWrapping; tex.wrapT = THREE.RepeatWrapping; tex.repeat.set(2, 2);
       return tex;
     }
 
     function generateFloorTexture() {
       const canvas = createProceduralCanvas(512, 512, (ctx, w, h) => {
-        ctx.fillStyle = '#14161a';
-        ctx.fillRect(0, 0, w, h);
+        ctx.fillStyle = '#14161a'; ctx.fillRect(0, 0, w, h);
         for (let i = 0; i < 6000; i++) {
           ctx.fillStyle = Math.random() > 0.5 ? 'rgba(255,255,255,0.03)' : 'rgba(0,0,0,0.1)';
           ctx.fillRect(Math.random() * w, Math.random() * h, 2, 2);
         }
       });
       const tex = new THREE.CanvasTexture(canvas);
-      tex.wrapS = THREE.RepeatWrapping;
-      tex.wrapT = THREE.RepeatWrapping;
-      tex.repeat.set(4, 4);
+      tex.wrapS = THREE.RepeatWrapping; tex.wrapT = THREE.RepeatWrapping; tex.repeat.set(4, 4);
       return tex;
     }
 
     function generateClayTexture() {
       const canvas = createProceduralCanvas(512, 512, (ctx, w, h) => {
-        ctx.fillStyle = '#c05335';
-        ctx.fillRect(0, 0, w, h);
+        ctx.fillStyle = '#c05335'; ctx.fillRect(0, 0, w, h);
         const img = ctx.getImageData(0, 0, w, h);
-        const d = img.data;
-        for (let i = 0; i < d.length; i += 4) {
+        for (let i = 0; i < img.data.length; i += 4) {
           const n = (Math.random() - 0.5) * 40;
-          d[i] = Math.min(255, Math.max(0, d[i] + n));
-          d[i+1] = Math.min(255, Math.max(0, d[i+1] + n * 0.7));
-          d[i+2] = Math.min(255, Math.max(0, d[i+2] + n * 0.4));
+          img.data[i] = Math.min(255, Math.max(0, img.data[i] + n));
+          img.data[i+1] = Math.min(255, Math.max(0, img.data[i+1] + n * 0.7));
+          img.data[i+2] = Math.min(255, Math.max(0, img.data[i+2] + n * 0.4));
         }
         ctx.putImageData(img, 0, 0);
       });
@@ -641,13 +599,10 @@
 
     function generateSoilTexture() {
       const canvas = createProceduralCanvas(256, 256, (ctx, w, h) => {
-        ctx.fillStyle = '#1d120d';
-        ctx.fillRect(0, 0, w, h);
+        ctx.fillStyle = '#1d120d'; ctx.fillRect(0, 0, w, h);
         for (let i = 0; i < 2200; i++) {
           ctx.fillStyle = Math.random() > 0.4 ? 'rgba(65, 42, 28, 0.75)' : 'rgba(8, 6, 4, 0.9)';
-          ctx.beginPath();
-          ctx.arc(Math.random() * w, Math.random() * h, Math.random() * 2 + 0.5, 0, Math.PI * 2);
-          ctx.fill();
+          ctx.beginPath(); ctx.arc(Math.random() * w, Math.random() * h, Math.random() * 2 + 0.5, 0, Math.PI * 2); ctx.fill();
         }
       });
       return new THREE.CanvasTexture(canvas);
@@ -655,30 +610,17 @@
 
     function generateCrateTexture() {
       const canvas = createProceduralCanvas(256, 256, (ctx, w, h) => {
-        ctx.fillStyle = '#9c6634';
-        ctx.fillRect(0, 0, w, h);
-        ctx.strokeStyle = 'rgba(70, 40, 15, 0.45)';
-        ctx.lineWidth = 2;
+        ctx.fillStyle = '#9c6634'; ctx.fillRect(0, 0, w, h);
+        ctx.strokeStyle = 'rgba(70, 40, 15, 0.45)'; ctx.lineWidth = 2;
         for (let y = 32; y < h; y += 32) {
-          ctx.beginPath();
-          ctx.moveTo(0, y);
-          ctx.lineTo(w, y);
-          ctx.stroke();
+          ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(w, y); ctx.stroke();
         }
-        ctx.strokeStyle = '#5a3517';
-        ctx.lineWidth = 14;
-        ctx.strokeRect(7, 7, w - 14, h - 14);
-        ctx.lineWidth = 10;
-        ctx.beginPath();
-        ctx.moveTo(12, 12); ctx.lineTo(w - 12, h - 12);
-        ctx.moveTo(w - 12, 12); ctx.lineTo(12, h - 12);
-        ctx.stroke();
+        ctx.strokeStyle = '#5a3517'; ctx.lineWidth = 14; ctx.strokeRect(7, 7, w - 14, h - 14);
+        ctx.lineWidth = 10; ctx.beginPath(); ctx.moveTo(12, 12); ctx.lineTo(w - 12, h - 12);
+        ctx.moveTo(w - 12, 12); ctx.lineTo(12, h - 12); ctx.stroke();
         ctx.fillStyle = '#2a1a0d';
-        const studs = [[16, 16], [w - 16, 16], [16, h - 16], [w - 16, h - 16]];
-        studs.forEach(([sx, sy]) => {
-          ctx.beginPath();
-          ctx.arc(sx, sy, 4.5, 0, Math.PI * 2);
-          ctx.fill();
+        [[16, 16], [w - 16, 16], [16, h - 16], [w - 16, h - 16]].forEach(([sx, sy]) => {
+          ctx.beginPath(); ctx.arc(sx, sy, 4.5, 0, Math.PI * 2); ctx.fill();
         });
       });
       return new THREE.CanvasTexture(canvas);
@@ -686,21 +628,15 @@
 
     function generateMagmaTexture() {
       const canvas = createProceduralCanvas(512, 512, (ctx, w, h) => {
-        ctx.fillStyle = '#181210';
-        ctx.fillRect(0, 0, w, h);
-        ctx.strokeStyle = '#ff4400';
-        ctx.lineWidth = 8;
-        ctx.shadowColor = '#ffaa00';
-        ctx.shadowBlur = 12;
+        ctx.fillStyle = '#181210'; ctx.fillRect(0, 0, w, h);
+        ctx.strokeStyle = '#ff4400'; ctx.lineWidth = 8;
+        ctx.shadowColor = '#ffaa00'; ctx.shadowBlur = 12;
         for (let i = 0; i < 14; i++) {
           ctx.beginPath();
-          let x = Math.random() * w;
-          let y = Math.random() * h;
+          let x = Math.random() * w, y = Math.random() * h;
           ctx.moveTo(x, y);
           for (let step = 0; step < 6; step++) {
-            x += (Math.random() - 0.5) * 80;
-            y += (Math.random() - 0.5) * 80;
-            ctx.lineTo(x, y);
+            x += (Math.random() - 0.5) * 80; y += (Math.random() - 0.5) * 80; ctx.lineTo(x, y);
           }
           ctx.stroke();
         }
@@ -709,22 +645,16 @@
     }
 
     function spawnShockwave(pos, normal = new THREE.Vector3(0, 0, 1), color = 0xffa336, maxR = 7.0) {
-      const ringGeo = new THREE.RingGeometry(0.2, 0.55, 36);
       const ringMat = new THREE.MeshBasicMaterial({
         color: color, side: THREE.DoubleSide, transparent: true,
         opacity: 0.95, blending: THREE.AdditiveBlending, depthWrite: false
       });
-      const ring = new THREE.Mesh(ringGeo, ringMat);
+      const ring = new THREE.Mesh(new THREE.RingGeometry(0.2, 0.55, 36), ringMat);
       ring.position.copy(pos).addScaledVector(normal, 0.05);
-
       const defaultNormal = new THREE.Vector3(0, 0, 1);
       if (Math.abs(normal.dot(defaultNormal)) < 0.999) {
-        const axis = new THREE.Vector3().crossVectors(defaultNormal, normal).normalize();
-        const angle = Math.acos(defaultNormal.dot(normal));
-        ring.quaternion.setFromAxisAngle(axis, angle);
-      } else if (normal.z < 0) {
-        ring.rotation.y = Math.PI;
-      }
+        ring.quaternion.setFromAxisAngle(new THREE.Vector3().crossVectors(defaultNormal, normal).normalize(), Math.acos(defaultNormal.dot(normal)));
+      } else if (normal.z < 0) { ring.rotation.y = Math.PI; }
       scene.add(ring);
       shockwaves.push({ mesh: ring, radius: 0.3, maxRadius: maxR, expandSpeed: 19.0, opacity: 0.95 });
     }
@@ -732,181 +662,103 @@
     function showCrashTextPopup(text = "💥 TOWER CRASH!!") {
       const pop = document.createElement('div');
       pop.className = 'crash-popup text-3xl md:text-5xl font-black bg-gradient-to-r from-amber-300 via-orange-400 to-rose-500 bg-clip-text text-transparent';
-      pop.innerText = text;
-      document.body.appendChild(pop);
+      pop.innerText = text; document.body.appendChild(pop);
       setTimeout(() => pop.remove(), 850);
     }
 
     function buildPyramidTower() {
-      towerBlocks.forEach(b => scene.remove(b.mesh));
-      towerBlocks = [];
-
+      towerBlocks.forEach(b => scene.remove(b.mesh)); towerBlocks = [];
       if (!crateTexture) crateTexture = generateCrateTexture();
       const crateMat = new THREE.MeshStandardMaterial({ map: crateTexture, roughness: 0.75, metalness: 0.15 });
-
-      const bW = 0.95, bH = 0.65, bD = 0.95;
-      const crateGeo = new THREE.BoxGeometry(bW, bH, bD);
-
-      const baseZ = -9.8;
-      const startY = ARENA.floorY + bH * 0.5;
-      const levels = 5;
+      const bW = 0.95, bH = 0.65, bD = 0.95, baseZ = -9.8, startY = ARENA.floorY + bH * 0.5, levels = 5;
 
       for (let lvl = 0; lvl < levels; lvl++) {
-        const countInRow = levels - lvl;
-        const rowWidth = countInRow * bW;
-        const startX = -rowWidth / 2 + bW / 2;
-        const yPos = startY + lvl * bH;
-
+        const countInRow = levels - lvl, startX = -(countInRow * bW) / 2 + bW / 2, yPos = startY + lvl * bH;
         for (let c = 0; c < countInRow; c++) {
-          const xPos = startX + c * bW;
-          const blockMesh = new THREE.Mesh(crateGeo, crateMat);
-          blockMesh.position.set(xPos, yPos, baseZ);
-          blockMesh.castShadow = true;
-          blockMesh.receiveShadow = true;
-          scene.add(blockMesh);
-
+          const blockMesh = new THREE.Mesh(new THREE.BoxGeometry(bW, bH, bD), crateMat);
+          blockMesh.position.set(startX + c * bW, yPos, baseZ);
+          blockMesh.castShadow = true; blockMesh.receiveShadow = true; scene.add(blockMesh);
           towerBlocks.push({
             mesh: blockMesh, size: new THREE.Vector3(bW, bH, bD), radius: Math.hypot(bW, bH, bD) * 0.5,
-            initialPos: new THREE.Vector3(xPos, yPos, baseZ), vel: new THREE.Vector3(0, 0, 0),
+            initialPos: new THREE.Vector3(startX + c * bW, yPos, baseZ), vel: new THREE.Vector3(0, 0, 0),
             angVel: new THREE.Vector3(0, 0, 0), isHit: false, isResting: false
           });
         }
       }
     }
 
-    function resetTower() {
-      buildPyramidTower();
-      showToast('🗼 ピラミッドタワーを再構築しました！');
-    }
+    function resetTower() { buildPyramidTower(); showToast('🗼 ピラミッドタワーを再構築しました！'); }
 
-    // 外部のCDNに依存しない自作のVRButtonロジック
     const VRButton = {
       createButton: function(renderer) {
         const button = document.createElement('button');
         button.id = 'VRButton';
-        button.style.position = 'absolute';
-        button.style.bottom = '20px';
-        button.style.left = '50%';
-        button.style.transform = 'translateX(-50%)';
-        button.style.padding = '12px 24px';
-        button.style.color = '#fff';
-        button.style.font = 'normal 14px sans-serif';
-        button.style.fontWeight = 'bold';
-        button.style.zIndex = '50';
-        button.style.cursor = 'pointer';
-        button.style.letterSpacing = '1px';
-
+        button.style.position = 'absolute'; button.style.bottom = '20px'; button.style.left = '50%';
+        button.style.transform = 'translateX(-50%)'; button.style.padding = '12px 24px';
+        button.style.color = '#fff'; button.style.font = 'normal 14px sans-serif'; button.style.fontWeight = 'bold';
+        button.style.zIndex = '50'; button.style.cursor = 'pointer'; button.style.letterSpacing = '1px';
         if ('xr' in navigator) {
           button.textContent = 'CHECKING VR...';
           navigator.xr.isSessionSupported('immersive-vr').then(function(supported) {
             if (supported) {
-              button.textContent = 'ENTER VR';
-              let currentSession = null;
+              button.textContent = 'ENTER VR'; let currentSession = null;
               function onSessionStarted(session) {
                 session.addEventListener('end', onSessionEnded);
-                renderer.xr.setSession(session);
-                button.textContent = 'EXIT VR';
-                currentSession = session;
+                renderer.xr.setSession(session); button.textContent = 'EXIT VR'; currentSession = session;
               }
               function onSessionEnded() {
                 currentSession.removeEventListener('end', onSessionEnded);
-                button.textContent = 'ENTER VR';
-                currentSession = null;
+                button.textContent = 'ENTER VR'; currentSession = null;
               }
               button.onclick = function() {
                 if (currentSession === null) {
-                  const sessionInit = { optionalFeatures: ['local-floor', 'bounded-floor', 'hand-tracking'] };
-                  navigator.xr.requestSession('immersive-vr', sessionInit).then(onSessionStarted);
-                } else {
-                  currentSession.end();
-                }
+                  navigator.xr.requestSession('immersive-vr', { optionalFeatures: ['local-floor', 'bounded-floor', 'hand-tracking'] }).then(onSessionStarted);
+                } else { currentSession.end(); }
               };
-            } else {
-              button.textContent = 'VR NOT SUPPORTED';
-              button.style.opacity = '0.5';
-              button.style.cursor = 'auto';
-            }
-          }).catch(function() {
-            button.textContent = 'VR ERROR';
-            button.style.opacity = '0.5';
-          });
-        } else {
-          button.textContent = 'WEBXR NOT AVAILABLE';
-          button.style.opacity = '0.5';
-          button.style.cursor = 'auto';
-        }
+            } else { button.textContent = 'VR NOT SUPPORTED'; button.style.opacity = '0.5'; }
+          }).catch(function() { button.textContent = 'VR ERROR'; button.style.opacity = '0.5'; });
+        } else { button.textContent = 'WEBXR NOT AVAILABLE'; button.style.opacity = '0.5'; }
         return button;
       }
     };
 
     function initScene() {
       const container = document.getElementById('canvas-container');
-      const w = container.clientWidth;
-      const h = container.clientHeight;
+      const w = container.clientWidth, h = container.clientHeight;
 
       scene = new THREE.Scene();
-      scene.background = new THREE.Color(0x08090d);
-      scene.fog = new THREE.FogExp2(0x08090d, 0.022);
+      scene.background = new THREE.Color(0x08090d); scene.fog = new THREE.FogExp2(0x08090d, 0.022);
 
-      // Camera setup with Group for WebXR positioning
       camera = new THREE.PerspectiveCamera(50, w / h, 0.1, 100);
-      cameraGroup = new THREE.Group();
-      scene.add(cameraGroup);
-      cameraGroup.add(camera);
+      cameraGroup = new THREE.Group(); scene.add(cameraGroup); cameraGroup.add(camera);
 
       renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
-      renderer.setSize(w, h);
-      renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-      renderer.shadowMap.enabled = true;
-      renderer.shadowMap.type = THREE.PCFSoftShadowMap;
-      renderer.toneMapping = THREE.ACESFilmicToneMapping;
-      renderer.toneMappingExposure = 1.25;
-      
-      // Enable WebXR (VR)
-      renderer.xr.enabled = true;
-      container.appendChild(renderer.domElement);
+      renderer.setSize(w, h); renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+      renderer.shadowMap.enabled = true; renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+      renderer.toneMapping = THREE.ACESFilmicToneMapping; renderer.toneMappingExposure = 1.25;
+      renderer.xr.enabled = true; container.appendChild(renderer.domElement);
 
-      updateCameraPositionImmediate();
+      updateCameraPositionImmediate(); document.body.appendChild( VRButton.createButton( renderer ) );
 
-      document.body.appendChild( VRButton.createButton( renderer ) );
+      raycaster = new THREE.Raycaster(); mouseNorm = new THREE.Vector2(0, 0);
 
-      raycaster = new THREE.Raycaster();
-      mouseNorm = new THREE.Vector2(0, 0);
-
-      setupEnvironment();
-      setupAimMarker();
-      setupLighting();
-      buildPyramidTower();
-      spawnReadyPot();
-      
-      // Setup VR specific additions
-      setupVRControllers();
-      setupVRUI();
-
-      window.addEventListener('resize', onResize);
-      setupInputControllers();
+      setupEnvironment(); setupAimMarker(); setupLighting(); buildPyramidTower(); spawnReadyPot();
+      setupVRControllers(); setupVRUI();
+      window.addEventListener('resize', onResize); setupInputControllers();
     }
 
     function setupVRUI() {
-      // VR空間内に浮かぶ専用ホログラムUI (左:鉢変更、右:タワーリセット)
-      const resetGeo = new THREE.BoxGeometry(1.2, 1.2, 1.2);
-      const resetMat = new THREE.MeshStandardMaterial({color: 0xffaa00, emissive: 0x664400, roughness: 0.2, wireframe: true});
-      const resetMesh = new THREE.Mesh(resetGeo, resetMat);
-      resetMesh.position.set(7.5, 4.5, -9); 
-      scene.add(resetMesh);
-      vrUI.push({ mesh: resetMesh, action: 'reset' });
+      const resetMesh = new THREE.Mesh(new THREE.BoxGeometry(1.2, 1.2, 1.2), new THREE.MeshStandardMaterial({color: 0xffaa00, emissive: 0x664400, roughness: 0.2, wireframe: true}));
+      resetMesh.position.set(7.5, 4.5, -9); scene.add(resetMesh); vrUI.push({ mesh: resetMesh, action: 'reset' });
 
-      const changeGeo = new THREE.SphereGeometry(0.8, 16, 16);
-      const changeMat = new THREE.MeshStandardMaterial({color: 0x0088ff, emissive: 0x003388, roughness: 0.2, wireframe: true});
-      const changeMesh = new THREE.Mesh(changeGeo, changeMat);
-      changeMesh.position.set(-7.5, 4.5, -9); 
-      scene.add(changeMesh);
-      vrUI.push({ mesh: changeMesh, action: 'change' });
+      const changeMesh = new THREE.Mesh(new THREE.SphereGeometry(0.8, 16, 16), new THREE.MeshStandardMaterial({color: 0x0088ff, emissive: 0x003388, roughness: 0.2, wireframe: true}));
+      changeMesh.position.set(-7.5, 4.5, -9); scene.add(changeMesh); vrUI.push({ mesh: changeMesh, action: 'change' });
     }
 
     function setupVRControllers() {
       raycasterVR = new THREE.Raycaster();
 
+      // トリガー(ピンチ)はUIのクリックにのみ使用します
       function onSelectStartVR(event) {
         const controller = event.target;
         const tempMatrix = new THREE.Matrix4();
@@ -914,376 +766,213 @@
         raycasterVR.ray.origin.setFromMatrixPosition(controller.matrixWorld);
         raycasterVR.ray.direction.set(0, 0, -1).applyMatrix4(tempMatrix);
 
-        // 1. UI Check first
         const uiIntersects = raycasterVR.intersectObjects(vrUI.map(u => u.mesh));
         if (uiIntersects.length > 0) {
             const hitUI = vrUI.find(u => u.mesh === uiIntersects[0].object);
             if (hitUI) {
                 if (hitUI.action === 'reset') resetTower();
                 else if (hitUI.action === 'change') cyclePotType();
-                playAuthenticImpactAudio(0.5);
-                createTapRippleUI(window.innerWidth/2, window.innerHeight/2);
+                playAuthenticImpactAudio(0.5); createTapRippleUI(window.innerWidth/2, window.innerHeight/2);
             }
-            return;
-        }
-
-        // 2. 物理投擲のための保持開始（トリガーを引く/つまむ）
-        const data = getControllerData(controller);
-        data.isHolding = true;
-        data.history = [];
-        
-        // 手元に鉢がなければすぐに生成する
-        if (!readyPot || !readyPot.mesh) {
-            spawnReadyPot();
-            readyPot.spawnProgress = 1.0;
-        }
-        
-        // 掴んだ瞬間にVRの手に合うように少し小さめにスケール
-        if (readyPot && readyPot.mesh) {
-            readyPot.mesh.scale.set(0.65, 0.65, 0.65);
         }
       }
 
-      function onSelectEndVR(event) {
-        const controller = event.target;
-        const data = getControllerData(controller);
-        if (!data.isHolding) return;
-        data.isHolding = false;
-
-        const validHistory = data.history.slice(0, Math.max(1, data.history.length - 2));
-
-        if (validHistory.length >= 2) {
-            const newest = validHistory[validHistory.length - 1];
-            let oldest = validHistory[0];
-            
-            for (let i = validHistory.length - 1; i >= 0; i--) {
-                if (newest.time - validHistory[i].time > 80) { // 直近の鋭い振りを取得
-                    oldest = validHistory[i];
-                    break;
-                }
-            }
-
-            const dt = (newest.time - oldest.time) / 1000;
-            
-            if (dt > 0.01) {
-                // 腕を振る速度（軌跡からのベクトル）のみをシンプルに使い、曲がりを防止
-                const swingVelocity = new THREE.Vector3().subVectors(newest.pos, oldest.pos).divideScalar(dt);
-                
-                // 威力を強める
-                const swingMultiplier = 4.5; 
-                const finalVelocity = swingVelocity.multiplyScalar(swingMultiplier);
-                
-                // 遊びやすさのための補正（重力負け防止、横ブレ抑制、直進推進力強化）
-                finalVelocity.y += 1.8; 
-                finalVelocity.x *= 0.8; 
-                finalVelocity.z *= 1.2; 
-                
-                if (finalVelocity.length() > 2.0) { // 軽く振っても飛ぶように
-                    launchPotWithPhysics(newest.pos, finalVelocity);
-                } else if (readyPot && readyPot.mesh) {
-                    readyPot.mesh.position.copy(ARENA.readyPos);
-                    readyPot.mesh.scale.set(1.0, 1.0, 1.0);
-                }
-            }
-        } else if (readyPot && readyPot.mesh) {
-            readyPot.mesh.position.copy(ARENA.readyPos);
-            readyPot.mesh.scale.set(1.0, 1.0, 1.0);
-        }
+      function onConnected(event) {
+         this.userData.handedness = event.data.handedness;
       }
 
       controller1 = renderer.xr.getController(0);
       controller1.addEventListener('selectstart', onSelectStartVR);
-      controller1.addEventListener('selectend', onSelectEndVR);
+      controller1.addEventListener('connected', onConnected);
       scene.add(controller1);
 
       controller2 = renderer.xr.getController(1);
       controller2.addEventListener('selectstart', onSelectStartVR);
-      controller2.addEventListener('selectend', onSelectEndVR);
+      controller2.addEventListener('connected', onConnected);
       scene.add(controller2);
 
-      // コントローラー・ハンドトラッキングのレイ（光線）
-      const geometry = new THREE.BufferGeometry().setFromPoints([
-        new THREE.Vector3(0, 0, 0),
-        new THREE.Vector3(0, 0, -1)
-      ]);
-      const material = new THREE.LineBasicMaterial({ color: 0xffaa00, transparent: true, opacity: 0.5 });
-      const line = new THREE.Line(geometry, material);
-      line.name = 'line';
-      line.scale.z = 20;
-
-      controller1.add(line.clone());
-      controller2.add(line.clone());
-      
-      // データ格納用
-      controller1.userData = { isHolding: false, history: [] };
-      controller2.userData = { isHolding: false, history: [] };
+      const lineGeo = new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(0, 0, 0), new THREE.Vector3(0, 0, -1)]);
+      const lineMat = new THREE.LineBasicMaterial({ color: 0xffaa00, transparent: true, opacity: 0.5 });
+      const line1 = new THREE.Line(lineGeo, lineMat); line1.name = 'line'; line1.scale.z = 20; controller1.add(line1);
+      const line2 = new THREE.Line(lineGeo, lineMat); line2.name = 'line'; line2.scale.z = 20; controller2.add(line2);
     }
 
-    function getControllerData(controller) {
-        return controller.userData;
-    }
-
-    function launchPotWithPhysics(pos, velocity) {
-        let potToThrow = readyPot;
-        if (!potToThrow || !potToThrow.mesh) return;
-
-        // 投げる瞬間に元のスケールに戻す
-        potToThrow.mesh.scale.set(1.0, 1.0, 1.0);
-        
-        flyingPots.push({
-            mesh: potToThrow.mesh, 
-            bodyMat: potToThrow.bodyMat, 
-            soilMat: potToThrow.soilMat, 
-            leafMat: potToThrow.leafMat,
-            potType: potToThrow.potType || activePotType, 
-            velocity: velocity.clone(),
-            angularVel: new THREE.Vector3((Math.random() - 0.5) * 6 + 9, (Math.random() - 0.5) * 10, -velocity.z * 0.35), 
-            trailTimer: 0
-        });
-        
-        readyPot = null;
-        showSpeedLines(); 
-        playThrowWhooshAudio(Math.abs(velocity.z) / 18.0); 
-        
-        // 連続投擲のためにすぐに手元にスポーンさせる
-        scheduleAutoRespawn(150);
-    }
-
-    function updateVRControllers() {
+    function updateVRControllers(dt) {
       if (!renderer.xr.isPresenting) return;
-      const now = performance.now();
-      
+      if (vrThrowCooldown > 0) vrThrowCooldown -= dt;
+
+      // 1. Raycast UI Pointer
       [controller1, controller2].forEach(controller => {
         if (controller && controller.visible) {
           const tempMatrix = new THREE.Matrix4();
           tempMatrix.identity().extractRotation(controller.matrixWorld);
           raycasterVR.ray.origin.setFromMatrixPosition(controller.matrixWorld);
           raycasterVR.ray.direction.set(0, 0, -1).applyMatrix4(tempMatrix);
-
           let hitDist = 20;
           const uiIntersects = raycasterVR.intersectObjects(vrUI.map(u => u.mesh));
-          if (uiIntersects.length > 0) {
-              hitDist = uiIntersects[0].distance;
-          } else {
+          if (uiIntersects.length > 0) { hitDist = uiIntersects[0].distance; } 
+          else {
               const hitPoint = new THREE.Vector3();
-              const intersects = raycasterVR.ray.intersectPlane(wallAimPlane, hitPoint);
-              if (intersects) {
+              if (raycasterVR.ray.intersectPlane(wallAimPlane, hitPoint)) {
                   hitDist = raycasterVR.ray.origin.distanceTo(hitPoint);
                   hitPoint.x = Math.max(-ARENA.sideX + 1.2, Math.min(ARENA.sideX - 1.2, hitPoint.x));
                   hitPoint.y = Math.max(ARENA.floorY + 0.6, Math.min(ARENA.ceilY - 0.5, hitPoint.y));
                   hitPoint.z = ARENA.wallZ;
-                  
-                  if (wallTargetMarker) {
-                    wallTargetMarker.position.copy(hitPoint);
-                  }
+                  if (wallTargetMarker) wallTargetMarker.position.copy(hitPoint);
               }
           }
-          
           const line = controller.getObjectByName('line');
           if (line) line.scale.z = hitDist;
-
-          const data = getControllerData(controller);
-          if (data && data.isHolding) {
-              const currentPos = new THREE.Vector3().setFromMatrixPosition(controller.matrixWorld);
-              const currentRot = new THREE.Quaternion().setFromRotationMatrix(controller.matrixWorld);
-              data.history.push({ pos: currentPos.clone(), rot: currentRot.clone(), time: now });
-              
-              if (data.history.length > 15) data.history.shift(); 
-              
-              if (readyPot && readyPot.mesh) {
-                  readyPot.mesh.position.copy(currentPos);
-                  readyPot.mesh.quaternion.copy(currentRot);
-                  readyPot.spawnProgress = 1.0;
-                  // 手に持っている時は少し小さく見せる
-                  readyPot.mesh.scale.set(0.65, 0.65, 0.65);
-              }
-          }
         }
       });
+
+      // 2. 完全自動ジェスチャー投擲ロジック
+      // 優先的に右手（無い場合は見えている手）を投擲手に設定
+      let targetController = null;
+      if (controller2 && controller2.userData.handedness === 'right' && controller2.visible) targetController = controller2;
+      else if (controller1 && controller1.userData.handedness === 'right' && controller1.visible) targetController = controller1;
+      else if (controller1 && controller1.visible) targetController = controller1;
+      else if (controller2 && controller2.visible) targetController = controller2;
+
+      if (targetController) {
+          const currentPos = new THREE.Vector3().setFromMatrixPosition(targetController.matrixWorld);
+          const currentRot = new THREE.Quaternion().setFromRotationMatrix(targetController.matrixWorld);
+          const data = targetController.userData;
+
+          // 速度（Velocity）の計算
+          if (!data.lastPos) data.lastPos = currentPos.clone();
+          const rawVel = new THREE.Vector3().subVectors(currentPos, data.lastPos).divideScalar(dt || 0.016);
+          data.lastPos.copy(currentPos);
+
+          if (!data.vel) data.vel = new THREE.Vector3();
+          data.vel.lerp(rawVel, 0.4); // なめらかに補間
+
+          // 発射判定: 前方(-Z方向)に向かって素早く手が動いた場合
+          // ボタン操作なしに、閾値を超えれば自動で発射される
+          const isForwardThrust = data.vel.z < -1.5 && data.vel.length() > 2.0;
+
+          if (vrThrowCooldown <= 0 && isForwardThrust && readyPot && readyPot.mesh) {
+              // 投げる！
+              const throwVel = data.vel.clone().multiplyScalar(1.6);
+              throwVel.z *= 1.3; // 前への勢いをブースト
+              throwVel.y += 1.8; // 少し上向きに投げて落ちにくくする
+              throwVel.x *= 0.5; // 横ブレを抑える
+
+              launchPotWithPhysics(currentPos, throwVel);
+              vrThrowCooldown = 0.4; // 次の鉢が出るまでのクールダウン(秒)
+          } 
+          else if (vrThrowCooldown <= 0) {
+              // 投げていない時は、常に手元に鉢を追従させる
+              if (!readyPot || !readyPot.mesh) spawnReadyPot();
+              
+              if (readyPot && readyPot.mesh) {
+                  // 手のひらの中に自然に収まるように少しオフセットする
+                  const offset = new THREE.Vector3(0, -0.05, -0.08).applyQuaternion(currentRot);
+                  readyPot.mesh.position.copy(currentPos).add(offset);
+                  readyPot.mesh.quaternion.copy(currentRot);
+                  readyPot.mesh.scale.set(0.65, 0.65, 0.65); // 持ちやすいサイズに縮小
+                  readyPot.spawnProgress = 1.0;
+              }
+          }
+      }
     }
 
     function setupAimMarker() {
       wallAimPlane = new THREE.Plane(new THREE.Vector3(0, 0, 1), -ARENA.wallZ);
-
       const markerCanvas = createProceduralCanvas(128, 128, (ctx, w, h) => {
-        ctx.clearRect(0, 0, w, h);
-        ctx.strokeStyle = 'rgba(251, 146, 60, 0.95)';
-        ctx.lineWidth = 6;
+        ctx.clearRect(0, 0, w, h); ctx.strokeStyle = 'rgba(251, 146, 60, 0.95)'; ctx.lineWidth = 6;
         ctx.beginPath(); ctx.arc(w / 2, h / 2, 48, 0, Math.PI * 2); ctx.stroke();
-        ctx.fillStyle = 'rgba(239, 68, 68, 0.95)';
-        ctx.beginPath(); ctx.arc(w / 2, h / 2, 10, 0, Math.PI * 2); ctx.fill();
-        ctx.strokeStyle = 'rgba(251, 146, 60, 0.85)';
-        ctx.lineWidth = 4;
-        ctx.beginPath();
-        ctx.moveTo(w / 2, 6); ctx.lineTo(w / 2, 28);
-        ctx.moveTo(w / 2, h - 6); ctx.lineTo(w / 2, h - 28);
-        ctx.moveTo(6, h / 2); ctx.lineTo(28, h / 2);
-        ctx.moveTo(w - 6, h / 2); ctx.lineTo(w - 28, h / 2);
-        ctx.stroke();
+        ctx.fillStyle = 'rgba(239, 68, 68, 0.95)'; ctx.beginPath(); ctx.arc(w / 2, h / 2, 10, 0, Math.PI * 2); ctx.fill();
+        ctx.strokeStyle = 'rgba(251, 146, 60, 0.85)'; ctx.lineWidth = 4; ctx.beginPath();
+        ctx.moveTo(w / 2, 6); ctx.lineTo(w / 2, 28); ctx.moveTo(w / 2, h - 6); ctx.lineTo(w / 2, h - 28);
+        ctx.moveTo(6, h / 2); ctx.lineTo(28, h / 2); ctx.moveTo(w - 6, h / 2); ctx.lineTo(w - 28, h / 2); ctx.stroke();
       });
-
-      const markerMat = new THREE.MeshBasicMaterial({
-        map: new THREE.CanvasTexture(markerCanvas), transparent: true, opacity: 0.85, depthWrite: false
-      });
-      wallTargetMarker = new THREE.Mesh(new THREE.PlaneGeometry(1.8, 1.8), markerMat);
-      wallTargetMarker.position.set(0, 1.2, ARENA.wallZ + 0.05);
-      scene.add(wallTargetMarker);
+      wallTargetMarker = new THREE.Mesh(new THREE.PlaneGeometry(1.8, 1.8), new THREE.MeshBasicMaterial({ map: new THREE.CanvasTexture(markerCanvas), transparent: true, opacity: 0.85, depthWrite: false }));
+      wallTargetMarker.position.set(0, 1.2, ARENA.wallZ + 0.05); scene.add(wallTargetMarker);
     }
 
     function setupEnvironment() {
-      const wallMat = new THREE.MeshStandardMaterial({ map: generateWallTexture(), roughness: 0.82, metalness: 0.12 });
-      const wallMesh = new THREE.Mesh(new THREE.PlaneGeometry(26, 18), wallMat);
-      wallMesh.position.set(0, 4.5, ARENA.wallZ);
-      wallMesh.receiveShadow = true;
-      scene.add(wallMesh);
+      const wallMesh = new THREE.Mesh(new THREE.PlaneGeometry(26, 18), new THREE.MeshStandardMaterial({ map: generateWallTexture(), roughness: 0.82, metalness: 0.12 }));
+      wallMesh.position.set(0, 4.5, ARENA.wallZ); wallMesh.receiveShadow = true; scene.add(wallMesh);
 
       const targetCanvas = createProceduralCanvas(256, 256, (ctx, w, h) => {
-        ctx.clearRect(0, 0, w, h);
-        ctx.strokeStyle = 'rgba(255, 160, 40, 0.45)'; ctx.lineWidth = 12;
+        ctx.clearRect(0, 0, w, h); ctx.strokeStyle = 'rgba(255, 160, 40, 0.45)'; ctx.lineWidth = 12;
         ctx.beginPath(); ctx.arc(w/2, h/2, 95, 0, Math.PI * 2); ctx.stroke();
         ctx.strokeStyle = 'rgba(255, 60, 20, 0.6)'; ctx.lineWidth = 8;
         ctx.beginPath(); ctx.arc(w/2, h/2, 50, 0, Math.PI * 2); ctx.stroke();
-        ctx.fillStyle = 'rgba(255, 220, 100, 0.8)';
-        ctx.beginPath(); ctx.arc(w/2, h/2, 14, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = 'rgba(255, 220, 100, 0.8)'; ctx.beginPath(); ctx.arc(w/2, h/2, 14, 0, Math.PI * 2); ctx.fill();
       });
-      const targetMesh = new THREE.Mesh(
-        new THREE.PlaneGeometry(3.6, 3.6),
-        new THREE.MeshBasicMaterial({ map: new THREE.CanvasTexture(targetCanvas), transparent: true, opacity: 0.85 })
-      );
-      targetMesh.position.set(0, 1.0, ARENA.wallZ + 0.02);
-      scene.add(targetMesh);
+      const targetMesh = new THREE.Mesh(new THREE.PlaneGeometry(3.6, 3.6), new THREE.MeshBasicMaterial({ map: new THREE.CanvasTexture(targetCanvas), transparent: true, opacity: 0.85 }));
+      targetMesh.position.set(0, 1.0, ARENA.wallZ + 0.02); scene.add(targetMesh);
 
-      const floorMat = new THREE.MeshStandardMaterial({ map: generateFloorTexture(), roughness: 0.38, metalness: 0.25 });
-      const floor = new THREE.Mesh(new THREE.PlaneGeometry(28, 40), floorMat);
-      floor.rotation.x = -Math.PI / 2;
-      floor.position.set(0, ARENA.floorY, 0);
-      floor.receiveShadow = true;
-      scene.add(floor);
+      const floor = new THREE.Mesh(new THREE.PlaneGeometry(28, 40), new THREE.MeshStandardMaterial({ map: generateFloorTexture(), roughness: 0.38, metalness: 0.25 }));
+      floor.rotation.x = -Math.PI / 2; floor.position.set(0, ARENA.floorY, 0); floor.receiveShadow = true; scene.add(floor);
 
-      const pedestalGeo = new THREE.CylinderGeometry(0.75, 0.9, 1.3, 32);
-      const pedestalMat = new THREE.MeshStandardMaterial({ color: 0x181a1f, roughness: 0.6, metalness: 0.3 });
-      const pedestal = new THREE.Mesh(pedestalGeo, pedestalMat);
-      pedestal.position.set(ARENA.readyPos.x, ARENA.floorY + 0.65, ARENA.readyPos.z);
-      pedestal.castShadow = true;
-      pedestal.receiveShadow = true;
-      scene.add(pedestal);
+      const pedestal = new THREE.Mesh(new THREE.CylinderGeometry(0.75, 0.9, 1.3, 32), new THREE.MeshStandardMaterial({ color: 0x181a1f, roughness: 0.6, metalness: 0.3 }));
+      pedestal.position.set(ARENA.readyPos.x, ARENA.floorY + 0.65, ARENA.readyPos.z); pedestal.castShadow = true; pedestal.receiveShadow = true; scene.add(pedestal);
     }
 
     function setupLighting() {
-      const ambLight = new THREE.AmbientLight(0xd5e3f5, 0.45);
-      scene.add(ambLight);
-
+      scene.add(new THREE.AmbientLight(0xd5e3f5, 0.45));
       const mainSpot = new THREE.SpotLight(0xfff1e0, 2.4);
-      mainSpot.position.set(2.5, 7.5, 6);
-      mainSpot.target.position.set(0, 0.8, -6);
-      mainSpot.angle = Math.PI / 3.2;
-      mainSpot.penumbra = 0.5;
-      mainSpot.castShadow = true;
-      mainSpot.shadow.mapSize.width = 2048;
-      mainSpot.shadow.mapSize.height = 2048;
-      mainSpot.shadow.bias = -0.001;
-      scene.add(mainSpot);
-      scene.add(mainSpot.target);
+      mainSpot.position.set(2.5, 7.5, 6); mainSpot.target.position.set(0, 0.8, -6);
+      mainSpot.angle = Math.PI / 3.2; mainSpot.penumbra = 0.5; mainSpot.castShadow = true;
+      mainSpot.shadow.mapSize.width = 2048; mainSpot.shadow.mapSize.height = 2048; mainSpot.shadow.bias = -0.001;
+      scene.add(mainSpot); scene.add(mainSpot.target);
 
-      const rimLight = new THREE.DirectionalLight(0x4080ff, 0.75);
-      rimLight.position.set(-6, 4.5, -9);
-      scene.add(rimLight);
-
-      const warmLight = new THREE.PointLight(0xff8833, 0.8, 12);
-      warmLight.position.set(0.4, 1.2, 3.2);
-      scene.add(warmLight);
+      const rimLight = new THREE.DirectionalLight(0x4080ff, 0.75); rimLight.position.set(-6, 4.5, -9); scene.add(rimLight);
+      const warmLight = new THREE.PointLight(0xff8833, 0.8, 12); warmLight.position.set(0.4, 1.2, 3.2); scene.add(warmLight);
     }
 
     function buildPotModel(type = 'terracotta') {
-      const group = new THREE.Group();
-      let bodyMat, scaleMult = 1.0;
+      const group = new THREE.Group(); let bodyMat, scaleMult = 1.0;
+      if (type === 'glazed') bodyMat = new THREE.MeshStandardMaterial({ color: 0x1a727d, roughness: 0.12, metalness: 0.25, envMapIntensity: 1.4 });
+      else if (type === 'porcelain') bodyMat = new THREE.MeshStandardMaterial({ color: 0xf2f4f8, roughness: 0.22, metalness: 0.08 });
+      else if (type === 'concrete') bodyMat = new THREE.MeshStandardMaterial({ color: 0x484c54, roughness: 0.95, metalness: 0.05 });
+      else if (type === 'dynamite') bodyMat = new THREE.MeshStandardMaterial({ color: 0xd91e18, roughness: 0.35, metalness: 0.2, emissive: 0x550505 });
+      else if (type === 'crystal') bodyMat = new THREE.MeshStandardMaterial({ color: 0x88e7ff, roughness: 0.06, metalness: 0.1, transparent: true, opacity: 0.82 });
+      else if (type === 'magma') { scaleMult = 1.55; bodyMat = new THREE.MeshStandardMaterial({ map: generateMagmaTexture(), roughness: 0.7, metalness: 0.2, emissive: 0xff3300, emissiveIntensity: 0.55 }); }
+      else bodyMat = new THREE.MeshStandardMaterial({ map: generateClayTexture(), roughness: 0.85, metalness: 0.05 });
 
-      if (type === 'glazed') {
-        bodyMat = new THREE.MeshStandardMaterial({ color: 0x1a727d, roughness: 0.12, metalness: 0.25, envMapIntensity: 1.4 });
-      } else if (type === 'porcelain') {
-        bodyMat = new THREE.MeshStandardMaterial({ color: 0xf2f4f8, roughness: 0.22, metalness: 0.08 });
-      } else if (type === 'concrete') {
-        bodyMat = new THREE.MeshStandardMaterial({ color: 0x484c54, roughness: 0.95, metalness: 0.05 });
-      } else if (type === 'dynamite') {
-        bodyMat = new THREE.MeshStandardMaterial({ color: 0xd91e18, roughness: 0.35, metalness: 0.2, emissive: 0x550505 });
-      } else if (type === 'crystal') {
-        bodyMat = new THREE.MeshStandardMaterial({ color: 0x88e7ff, roughness: 0.06, metalness: 0.1, transparent: true, opacity: 0.82 });
-      } else if (type === 'magma') {
-        scaleMult = 1.55;
-        bodyMat = new THREE.MeshStandardMaterial({ map: generateMagmaTexture(), roughness: 0.7, metalness: 0.2, emissive: 0xff3300, emissiveIntensity: 0.55 });
-      } else {
-        bodyMat = new THREE.MeshStandardMaterial({ map: generateClayTexture(), roughness: 0.85, metalness: 0.05 });
-      }
-
-      const pts = [];
-      const potH = 1.0 * scaleMult, bR = 0.42 * scaleMult, tR = 0.62 * scaleMult, rimR = 0.68 * scaleMult;
+      const pts = [], potH = 1.0 * scaleMult, bR = 0.42 * scaleMult, tR = 0.62 * scaleMult, rimR = 0.68 * scaleMult;
       pts.push(new THREE.Vector2(bR * 0.8, 0.0), new THREE.Vector2(bR, 0.05), new THREE.Vector2(bR * 1.05, 0.3 * scaleMult));
       pts.push(new THREE.Vector2(tR * 0.96, potH * 0.86), new THREE.Vector2(rimR, potH * 0.92), new THREE.Vector2(rimR, potH));
       pts.push(new THREE.Vector2(rimR * 0.91, potH), new THREE.Vector2(tR * 0.85, potH * 0.86), new THREE.Vector2(bR * 0.75, 0.12 * scaleMult), new THREE.Vector2(0.12, 0.1));
-
-      const potGeo = new THREE.LatheGeometry(pts, 36);
-      potGeo.computeVertexNormals();
-      const bodyMesh = new THREE.Mesh(potGeo, bodyMat);
-      bodyMesh.castShadow = true; bodyMesh.receiveShadow = true;
-      group.add(bodyMesh);
+      const potGeo = new THREE.LatheGeometry(pts, 36); potGeo.computeVertexNormals();
+      const bodyMesh = new THREE.Mesh(potGeo, bodyMat); bodyMesh.castShadow = true; bodyMesh.receiveShadow = true; group.add(bodyMesh);
 
       if (type === 'dynamite') {
-        const fuseCurve = new THREE.CatmullRomCurve3([
-          new THREE.Vector3(0, potH * 0.9, 0), new THREE.Vector3(0.05, potH * 1.15, 0.03), new THREE.Vector3(-0.02, potH * 1.32, 0.08)
-        ]);
-        const fuseGeo = new THREE.TubeGeometry(fuseCurve, 10, 0.022, 6, false);
-        const fuseMesh = new THREE.Mesh(fuseGeo, new THREE.MeshBasicMaterial({ color: 0x332211 }));
-        group.add(fuseMesh);
-        const sparkGeo = new THREE.SphereGeometry(0.065, 8, 8);
-        const sparkMesh = new THREE.Mesh(sparkGeo, new THREE.MeshBasicMaterial({ color: 0xffdd44 }));
-        sparkMesh.position.set(-0.02, potH * 1.32, 0.08);
-        group.add(sparkMesh);
+        const fuseCurve = new THREE.CatmullRomCurve3([new THREE.Vector3(0, potH * 0.9, 0), new THREE.Vector3(0.05, potH * 1.15, 0.03), new THREE.Vector3(-0.02, potH * 1.32, 0.08)]);
+        group.add(new THREE.Mesh(new THREE.TubeGeometry(fuseCurve, 10, 0.022, 6, false), new THREE.MeshBasicMaterial({ color: 0x332211 })));
+        const spark = new THREE.Mesh(new THREE.SphereGeometry(0.065, 8, 8), new THREE.MeshBasicMaterial({ color: 0xffdd44 }));
+        spark.position.set(-0.02, potH * 1.32, 0.08); group.add(spark);
       }
 
       const soilMat = new THREE.MeshStandardMaterial({ map: generateSoilTexture(), roughness: 0.96, metalness: 0.02 });
-      const soilGeo = new THREE.CylinderGeometry(tR * 0.85, tR * 0.76, 0.22 * scaleMult, 28);
-      const soilMesh = new THREE.Mesh(soilGeo, soilMat);
-      soilMesh.position.y = potH * 0.82; soilMesh.castShadow = true;
-      group.add(soilMesh);
+      const soilMesh = new THREE.Mesh(new THREE.CylinderGeometry(tR * 0.85, tR * 0.76, 0.22 * scaleMult, 28), soilMat);
+      soilMesh.position.y = potH * 0.82; soilMesh.castShadow = true; group.add(soilMesh);
 
-      const plantGroup = new THREE.Group();
-      plantGroup.position.y = potH * 0.86;
-
+      const plantGroup = new THREE.Group(); plantGroup.position.y = potH * 0.86;
       let leafColor = 0x2ea048;
       if (type === 'glazed') leafColor = 0x227842; else if (type === 'porcelain') leafColor = 0x1d6332;
-      else if (type === 'dynamite') leafColor = 0x772211; else if (type === 'crystal') leafColor = 0x44ddee;
-      else if (type === 'magma') leafColor = 0xff6600;
-
+      else if (type === 'dynamite') leafColor = 0x772211; else if (type === 'crystal') leafColor = 0x44ddee; else if (type === 'magma') leafColor = 0xff6600;
       const leafMat = new THREE.MeshStandardMaterial({ color: leafColor, roughness: type === 'crystal' ? 0.1 : 0.35, metalness: 0.05, side: THREE.DoubleSide });
       const leafCount = (type === 'dynamite') ? 5 : 10;
       
       for (let i = 0; i < leafCount; i++) {
         const ang = (i / leafCount) * Math.PI * 2 + Math.random() * 0.3;
-        const stemCurve = new THREE.CatmullRomCurve3([
-          new THREE.Vector3(Math.cos(ang) * 0.04, 0, Math.sin(ang) * 0.04),
-          new THREE.Vector3(Math.cos(ang) * 0.28, (0.38 + Math.random() * 0.2) * scaleMult, Math.sin(ang) * 0.28),
-          new THREE.Vector3(Math.cos(ang) * 0.58, (0.54 + Math.random() * 0.25) * scaleMult, Math.sin(ang) * 0.58)
-        ]);
-        const stemGeo = new THREE.TubeGeometry(stemCurve, 10, 0.028 * scaleMult, 6, false);
-        const stem = new THREE.Mesh(stemGeo, new THREE.MeshStandardMaterial({ color: 0x1b4d24, roughness: 0.6 }));
+        const stemCurve = new THREE.CatmullRomCurve3([new THREE.Vector3(Math.cos(ang) * 0.04, 0, Math.sin(ang) * 0.04), new THREE.Vector3(Math.cos(ang) * 0.28, (0.38 + Math.random() * 0.2) * scaleMult, Math.sin(ang) * 0.28), new THREE.Vector3(Math.cos(ang) * 0.58, (0.54 + Math.random() * 0.25) * scaleMult, Math.sin(ang) * 0.58)]);
+        const stem = new THREE.Mesh(new THREE.TubeGeometry(stemCurve, 10, 0.028 * scaleMult, 6, false), new THREE.MeshStandardMaterial({ color: 0x1b4d24, roughness: 0.6 }));
         stem.castShadow = true; plantGroup.add(stem);
-
         const leafGeo = new THREE.PlaneGeometry(0.42 * scaleMult, 0.68 * scaleMult, 5, 7);
         const pos = leafGeo.attributes.position;
-        for (let p = 0; p < pos.count; p++) {
-          const py = pos.getY(p), px = pos.getX(p);
-          pos.setZ(p, Math.sin((py + 0.35) * 3) * 0.09 - (px * px) * 0.16);
-        }
+        for (let p = 0; p < pos.count; p++) pos.setZ(p, Math.sin((pos.getY(p) + 0.35) * 3) * 0.09 - (pos.getX(p) * pos.getX(p)) * 0.16);
         leafGeo.computeVertexNormals();
-
         const leafMesh = new THREE.Mesh(leafGeo, leafMat);
-        leafMesh.position.copy(stemCurve.getPoint(1.0));
-        leafMesh.rotation.set(0.45 + Math.random() * 0.25, ang - Math.PI / 2, (Math.random() - 0.5) * 0.4);
+        leafMesh.position.copy(stemCurve.getPoint(1.0)); leafMesh.rotation.set(0.45 + Math.random() * 0.25, ang - Math.PI / 2, (Math.random() - 0.5) * 0.4);
         leafMesh.castShadow = true; plantGroup.add(leafMesh);
       }
-
-      group.add(plantGroup);
-      return { group, bodyMat, soilMat, leafMat, potType: type, scaleMult };
+      group.add(plantGroup); return { group, bodyMat, soilMat, leafMat, potType: type, scaleMult };
     }
 
     function spawnReadyPot() {
@@ -1301,7 +990,7 @@
       return readyPot;
     }
 
-    function scheduleAutoRespawn(delayMs = 150) { // 連続投擲のためにスポーンを早く
+    function scheduleAutoRespawn(delayMs = 280) {
       if (autoRespawnTimeout) clearTimeout(autoRespawnTimeout);
       autoRespawnTimeout = setTimeout(() => { spawnReadyPot(); }, delayMs);
     }
@@ -1314,12 +1003,10 @@
         grad.addColorStop(0, 'rgba(10, 8, 7, 0.95)'); grad.addColorStop(0.3, 'rgba(40, 22, 14, 0.85)');
         grad.addColorStop(0.7, 'rgba(25, 18, 12, 0.4)'); grad.addColorStop(1, 'rgba(0, 0, 0, 0)');
         ctx.fillStyle = grad; ctx.beginPath(); ctx.arc(w/2, h/2, 180, 0, Math.PI * 2); ctx.fill();
-
         ctx.strokeStyle = 'rgba(8, 7, 6, 0.95)'; ctx.lineWidth = 3.5;
         const numCracks = 10 + Math.floor(Math.random() * 6);
         for (let i = 0; i < numCracks; i++) {
-          let cx = w/2, cy = h/2, angle = (i / numCracks) * Math.PI * 2 + (Math.random() - 0.5) * 0.4;
-          let len = 120 + Math.random() * 110;
+          let cx = w/2, cy = h/2, angle = (i / numCracks) * Math.PI * 2 + (Math.random() - 0.5) * 0.4, len = 120 + Math.random() * 110;
           ctx.beginPath(); ctx.moveTo(cx, cy);
           let step = 0;
           while (step < len) {
@@ -1329,25 +1016,16 @@
           ctx.stroke();
         }
       });
-      const decalMat = new THREE.MeshBasicMaterial({ map: new THREE.CanvasTexture(canvas), transparent: true, opacity: 0.92, depthWrite: false });
-      const decalMesh = new THREE.Mesh(new THREE.PlaneGeometry(decalSize, decalSize), decalMat);
+      const decalMesh = new THREE.Mesh(new THREE.PlaneGeometry(decalSize, decalSize), new THREE.MeshBasicMaterial({ map: new THREE.CanvasTexture(canvas), transparent: true, opacity: 0.92, depthWrite: false }));
       decalMesh.position.set(x, y, ARENA.wallZ + 0.03 + (wallImpactDecals.length * 0.001));
       scene.add(decalMesh); wallImpactDecals.push(decalMesh);
       if (wallImpactDecals.length > 20) { const old = wallImpactDecals.shift(); scene.remove(old); }
     }
 
     function shatterPot(flyingObj) {
-      const impactPos = flyingObj.mesh.position.clone();
-      const impactVel = flyingObj.velocity.clone();
-      const hitSpeed = impactVel.length();
-      const pType = flyingObj.potType || 'terracotta';
-      const speedKmH = Math.round(hitSpeed * 3.6 * 4.4);
-
-      analytics.smashes++;
-      if (speedKmH > analytics.maxSpeed) analytics.maxSpeed = speedKmH;
-      document.getElementById('stat-smashes').innerText = analytics.smashes;
-      document.getElementById('stat-speed').innerHTML = `${analytics.maxSpeed} <span class="text-[9px]">km/h</span>`;
-
+      const impactPos = flyingObj.mesh.position.clone(), impactVel = flyingObj.velocity.clone(), hitSpeed = impactVel.length(), pType = flyingObj.potType || 'terracotta', speedKmH = Math.round(hitSpeed * 3.6 * 4.4);
+      analytics.smashes++; if (speedKmH > analytics.maxSpeed) analytics.maxSpeed = speedKmH;
+      document.getElementById('stat-smashes').innerText = analytics.smashes; document.getElementById('stat-speed').innerHTML = `${analytics.maxSpeed} <span class="text-[9px]">km/h</span>`;
       scene.remove(flyingObj.mesh);
 
       if (pType === 'dynamite') {
@@ -1357,8 +1035,7 @@
           const d = tb.mesh.position.distanceTo(impactPos);
           if (d < 6.5) {
             tb.isHit = true; tb.isResting = false;
-            const blastDir = tb.mesh.position.clone().sub(impactPos).normalize();
-            tb.vel.addScaledVector(blastDir, (6.5 - d) * 7.5); tb.vel.y += Math.random() * 4.0 + 3.0;
+            tb.vel.addScaledVector(tb.mesh.position.clone().sub(impactPos).normalize(), (6.5 - d) * 7.5); tb.vel.y += Math.random() * 4.0 + 3.0;
             tb.angVel.set((Math.random() - 0.5) * 25, (Math.random() - 0.5) * 25, (Math.random() - 0.5) * 25);
           }
         });
@@ -1382,32 +1059,23 @@
 
       const shardMultiplier = (pType === 'crystal') ? 3.0 : (pType === 'magma' ? 1.4 : 1.0);
       const baseCount = Math.floor(6 * shardMultiplier);
-
       for (let b = 0; b < baseCount; b++) {
         const baseSize = 0.28 + Math.random() * 0.18;
         const baseMesh = new THREE.Mesh(new THREE.CylinderGeometry(baseSize, baseSize * 1.1, 0.09, 5), flyingObj.bodyMat);
         baseMesh.castShadow = true; baseMesh.position.copy(impactPos).add(new THREE.Vector3((Math.random() - 0.5) * 0.4, (Math.random() - 0.5) * 0.4, 0.1));
         baseMesh.rotation.set(Math.random() * Math.PI, Math.random() * Math.PI, 0);
         const burstAngle = Math.random() * Math.PI * 2, bForce = (Math.random() * 0.6 + 0.5) * hitSpeed * (pType === 'dynamite' ? 0.9 : 0.4);
-        shards.push({
-          mesh: baseMesh, vel: new THREE.Vector3(Math.cos(burstAngle) * bForce, Math.sin(burstAngle) * bForce * 0.7 + 1.5, Math.abs(impactVel.z) * (0.32 + Math.random() * 0.35)),
-          angVel: new THREE.Vector3((Math.random() - 0.5) * 20, (Math.random() - 0.5) * 20, (Math.random() - 0.5) * 20), radius: baseSize * 0.8, isResting: false
-        });
+        shards.push({ mesh: baseMesh, vel: new THREE.Vector3(Math.cos(burstAngle) * bForce, Math.sin(burstAngle) * bForce * 0.7 + 1.5, Math.abs(impactVel.z) * (0.32 + Math.random() * 0.35)), angVel: new THREE.Vector3((Math.random() - 0.5) * 20, (Math.random() - 0.5) * 20, (Math.random() - 0.5) * 20), radius: baseSize * 0.8, isResting: false });
         scene.add(baseMesh);
       }
 
-      const shardCount = Math.floor(45 * shardMultiplier);
-      analytics.shards += shardCount;
+      const shardCount = Math.floor(45 * shardMultiplier); analytics.shards += shardCount;
       for (let i = 0; i < shardCount; i++) {
         const sSize = 0.12 + Math.random() * 0.2;
         const shardMesh = new THREE.Mesh(new THREE.ConeGeometry(sSize, sSize * 1.6, 3 + Math.floor(Math.random() * 3)), flyingObj.bodyMat);
-        shardMesh.castShadow = true; shardMesh.receiveShadow = true;
-        shardMesh.position.copy(impactPos).add(new THREE.Vector3((Math.random() - 0.5) * 0.45, (Math.random() - 0.5) * 0.45, (Math.random() - 0.5) * 0.2));
+        shardMesh.castShadow = true; shardMesh.receiveShadow = true; shardMesh.position.copy(impactPos).add(new THREE.Vector3((Math.random() - 0.5) * 0.45, (Math.random() - 0.5) * 0.45, (Math.random() - 0.5) * 0.2));
         const burstAngle = Math.random() * Math.PI * 2, burstStr = (Math.random() * 0.7 + 0.4) * hitSpeed * (pType === 'dynamite' ? 1.2 : 0.6);
-        shards.push({
-          mesh: shardMesh, vel: new THREE.Vector3(Math.cos(burstAngle) * burstStr + impactVel.x * 0.3, Math.sin(burstAngle) * burstStr * 0.75 + Math.random() * 3.2, Math.abs(impactVel.z) * (0.3 + Math.random() * 0.45)),
-          angVel: new THREE.Vector3((Math.random() - 0.5) * 32, (Math.random() - 0.5) * 32, (Math.random() - 0.5) * 32), radius: sSize * 0.65, isResting: false
-        });
+        shards.push({ mesh: shardMesh, vel: new THREE.Vector3(Math.cos(burstAngle) * burstStr + impactVel.x * 0.3, Math.sin(burstAngle) * burstStr * 0.75 + Math.random() * 3.2, Math.abs(impactVel.z) * (0.3 + Math.random() * 0.45)), angVel: new THREE.Vector3((Math.random() - 0.5) * 32, (Math.random() - 0.5) * 32, (Math.random() - 0.5) * 32), radius: sSize * 0.65, isResting: false });
         scene.add(shardMesh);
       }
 
@@ -1420,28 +1088,21 @@
         const soilMesh = new THREE.Mesh(new THREE.DodecahedronGeometry(0.045 + Math.random() * 0.065, 0), flyingObj.soilMat);
         soilMesh.castShadow = true; soilMesh.position.copy(impactPos).add(new THREE.Vector3((Math.random() - 0.5) * 0.5, (Math.random() - 0.5) * 0.5, (Math.random() - 0.5) * 0.3));
         const ang = Math.random() * Math.PI * 2, force = (Math.random() * 0.7 + 0.3) * hitSpeed * (pType === 'dynamite' ? 0.9 : 0.45);
-        soilParticles.push({
-          mesh: soilMesh, vel: new THREE.Vector3(Math.cos(ang) * force, Math.sin(ang) * force * 0.8 + Math.random() * 2.5, Math.abs(impactVel.z) * (0.2 + Math.random() * 0.3)),
-          angVel: new THREE.Vector3((Math.random() - 0.5) * 15, (Math.random() - 0.5) * 15, 0), isResting: false
-        });
+        soilParticles.push({ mesh: soilMesh, vel: new THREE.Vector3(Math.cos(ang) * force, Math.sin(ang) * force * 0.8 + Math.random() * 2.5, Math.abs(impactVel.z) * (0.2 + Math.random() * 0.3)), angVel: new THREE.Vector3((Math.random() - 0.5) * 15, (Math.random() - 0.5) * 15, 0), isResting: false });
         scene.add(soilMesh);
       }
 
       for (let f = 0; f < 9; f++) {
         const leafMesh = new THREE.Mesh(new THREE.PlaneGeometry(0.32, 0.5), flyingObj.leafMat);
         leafMesh.position.copy(impactPos).add(new THREE.Vector3((Math.random() - 0.5) * 0.6, (Math.random() - 0.5) * 0.6, 0.1)); leafMesh.castShadow = true;
-        foliagePieces.push({
-          mesh: leafMesh, vel: new THREE.Vector3((Math.random() - 0.5) * 5, Math.random() * 3 + 1.2, Math.abs(impactVel.z) * 0.25 + Math.random() * 2),
-          angVel: new THREE.Vector3((Math.random() - 0.5) * 14, (Math.random() - 0.5) * 14, (Math.random() - 0.5) * 14), flutter: Math.random() * Math.PI * 2
-        });
+        foliagePieces.push({ mesh: leafMesh, vel: new THREE.Vector3((Math.random() - 0.5) * 5, Math.random() * 3 + 1.2, Math.abs(impactVel.z) * 0.25 + Math.random() * 2), angVel: new THREE.Vector3((Math.random() - 0.5) * 14, (Math.random() - 0.5) * 14, (Math.random() - 0.5) * 14), flutter: Math.random() * Math.PI * 2 });
         scene.add(leafMesh);
       }
       spawnDustExplosion(impactPos);
     }
 
     function spawnDustExplosion(pos) {
-      const dustGeo = new THREE.PlaneGeometry(1.1, 1.1);
-      const dustMat = new THREE.MeshBasicMaterial({ color: activePotType === 'glazed' ? 0x82c8ce : (activePotType === 'porcelain' ? 0xe5eaf2 : 0xd29882), transparent: true, opacity: 0.55, depthWrite: false });
+      const dustGeo = new THREE.PlaneGeometry(1.1, 1.1), dustMat = new THREE.MeshBasicMaterial({ color: activePotType === 'glazed' ? 0x82c8ce : (activePotType === 'porcelain' ? 0xe5eaf2 : 0xd29882), transparent: true, opacity: 0.55, depthWrite: false });
       for (let d = 0; d < 20; d++) {
         const dust = new THREE.Mesh(dustGeo, dustMat.clone());
         dust.position.copy(pos).add(new THREE.Vector3((Math.random() - 0.5) * 0.5, (Math.random() - 0.5) * 0.5, (Math.random() - 0.5) * 0.25));
@@ -1454,8 +1115,7 @@
     function emitPotTrail(pos) {
       const trailMesh = new THREE.Mesh(new THREE.SphereGeometry(0.12, 4, 4), new THREE.MeshBasicMaterial({ color: 0xffa055, transparent: true, opacity: 0.35, depthWrite: false }));
       trailMesh.position.copy(pos).add(new THREE.Vector3((Math.random() - 0.5) * 0.2, (Math.random() - 0.5) * 0.2, (Math.random() - 0.5) * 0.2));
-      scene.add(trailMesh);
-      potTrails.push({ mesh: trailMesh, opacity: 0.35, scale: 1.0 });
+      scene.add(trailMesh); potTrails.push({ mesh: trailMesh, opacity: 0.35, scale: 1.0 });
     }
 
     function triggerFlashImpact() { const f = document.getElementById('flash-overlay'); f.style.opacity = '0.45'; setTimeout(() => f.style.opacity = '0', 70); }
@@ -1465,23 +1125,18 @@
     const GRAVITY = -15.5, FLOOR_RESTITUTION = 0.28, WALL_RESTITUTION = 0.38, FRICTION = 0.88;
 
     function stepPhysics(delta) {
-      if (hitStopTimer > 0) {
-        hitStopTimer -= delta; updateCameraMotion(delta * 0.5); return;
-      }
+      if (hitStopTimer > 0) { hitStopTimer -= delta; updateCameraMotion(delta * 0.5); return; }
       const effDt = Math.min(delta, 0.05) * timeScale;
 
-      if (readyPot && readyPot.mesh && readyPot.spawnProgress < 1.0) {
+      if (readyPot && readyPot.mesh && readyPot.spawnProgress < 1.0 && (!renderer.xr.isPresenting)) {
         readyPot.spawnProgress = Math.min(1.0, readyPot.spawnProgress + effDt * 7.0);
-        const s = Math.sin(readyPot.spawnProgress * Math.PI * 0.5); 
-        // 掴まれていない状態では少し小さめにポップ
-        if (readyPot.mesh.scale.x < 1.0) readyPot.mesh.scale.set(s * 0.8, s * 0.8, s * 0.8);
+        const s = Math.sin(readyPot.spawnProgress * Math.PI * 0.5); readyPot.mesh.scale.set(s, s, s);
       }
 
       for (let p = flyingPots.length - 1; p >= 0; p--) {
         const fp = flyingPots[p];
         if (fp.mesh.scale.x < 1.0) fp.mesh.scale.set(1.0, 1.0, 1.0);
-        fp.velocity.y += GRAVITY * effDt;
-        fp.mesh.position.addScaledVector(fp.velocity, effDt);
+        fp.velocity.y += GRAVITY * effDt; fp.mesh.position.addScaledVector(fp.velocity, effDt);
         fp.mesh.rotation.x += fp.angularVel.x * effDt; fp.mesh.rotation.y += fp.angularVel.y * effDt; fp.mesh.rotation.z += fp.angularVel.z * effDt;
 
         fp.trailTimer = (fp.trailTimer || 0) + effDt;
@@ -1532,18 +1187,12 @@
 
       for (let s of soilParticles) {
         if (s.isResting) continue; s.vel.y += (GRAVITY * 1.3) * effDt; s.mesh.position.addScaledVector(s.vel, effDt);
-        if (s.mesh.position.y <= ARENA.floorY + 0.05) {
-          s.mesh.position.y = ARENA.floorY + 0.05; s.vel.y = -s.vel.y * 0.1; s.vel.x *= 0.6; s.vel.z *= 0.6;
-          if (s.vel.lengthSq() < 0.1) s.isResting = true;
-        }
+        if (s.mesh.position.y <= ARENA.floorY + 0.05) { s.mesh.position.y = ARENA.floorY + 0.05; s.vel.y = -s.vel.y * 0.1; s.vel.x *= 0.6; s.vel.z *= 0.6; if (s.vel.lengthSq() < 0.1) s.isResting = true; }
       }
 
       for (let rb of rootBallDebris) {
         if (rb.isResting) continue; rb.vel.y += GRAVITY * effDt; rb.mesh.position.addScaledVector(rb.vel, effDt);
-        if (rb.mesh.position.y <= ARENA.floorY + 0.3) {
-          rb.mesh.position.y = ARENA.floorY + 0.3; rb.vel.y = -rb.vel.y * 0.18; rb.vel.multiplyScalar(0.75);
-          if (rb.vel.lengthSq() < 0.1) rb.isResting = true;
-        }
+        if (rb.mesh.position.y <= ARENA.floorY + 0.3) { rb.mesh.position.y = ARENA.floorY + 0.3; rb.vel.y = -rb.vel.y * 0.18; rb.vel.multiplyScalar(0.75); if (rb.vel.lengthSq() < 0.1) rb.isResting = true; }
       }
 
       for (let l of foliagePieces) {
@@ -1578,32 +1227,23 @@
         if (Math.abs(tb.mesh.position.x) >= ARENA.sideX - 0.5) tb.vel.x = -tb.vel.x * 0.4;
       }
 
-      updateCameraMotion(effDt);
-      updateVRUIAnimation(effDt);
+      updateCameraMotion(effDt); updateVRUIAnimation(effDt);
     }
 
     function updateCameraMotion(dt) {
-      if (renderer && renderer.xr && renderer.xr.isPresenting) return; // VR時はカメラを揺らさない
-
+      if (renderer.xr.isPresenting) return; // VR時は酔い防止のためカメラを揺らさない
       if (cameraShake > 0.001) {
-        cameraOffset.x = (Math.random() - 0.5) * cameraShake;
-        cameraOffset.y = (Math.random() - 0.5) * cameraShake;
-        cameraShake *= Math.pow(0.04, dt);
+        cameraOffset.x = (Math.random() - 0.5) * cameraShake; cameraOffset.y = (Math.random() - 0.5) * cameraShake; cameraShake *= Math.pow(0.04, dt);
       } else { cameraOffset.set(0, 0, 0); }
-
       if (camera.fov > 50) {
         camera.fov += cameraFovVelocity * dt; cameraFovVelocity -= 65 * dt;
         if (camera.fov < 50) camera.fov = 50; camera.updateProjectionMatrix();
       }
-      camera.position.copy(baseCameraPos).add(cameraOffset);
-      camera.lookAt(cameraConfigs[cameraMode].target);
+      camera.position.copy(baseCameraPos).add(cameraOffset); camera.lookAt(cameraConfigs[cameraMode].target);
     }
 
     function updateVRUIAnimation(dt) {
-       vrUI.forEach(ui => {
-           ui.mesh.rotation.x += dt * 0.5;
-           ui.mesh.rotation.y += dt * 1.0;
-       });
+       vrUI.forEach(ui => { ui.mesh.rotation.x += dt * 0.5; ui.mesh.rotation.y += dt * 1.0; });
     }
 
     function getWallIntersectPoint(clientX, clientY) {
@@ -1663,7 +1303,7 @@
           powerGauge.innerText = `AIM: ${Math.round(Math.min(dist / 200, 1.0) * 100)}%`;
           reticleHud.style.left = `${e.clientX - 40}px`; reticleHud.style.top = `${e.clientY - 40}px`;
           aimLine.setAttribute('x2', e.clientX); aimLine.setAttribute('y2', e.clientY);
-          if (readyPot && readyPot.mesh) {
+          if (readyPot && readyPot.mesh && !renderer.xr.isPresenting) {
             readyPot.mesh.position.x = readyPot.initialPos.x + (dx / window.innerWidth) * 1.5;
             readyPot.mesh.position.y = readyPot.initialPos.y - (dy / window.innerHeight) * 1.0;
             readyPot.mesh.rotation.z = -dx * 0.003; readyPot.mesh.rotation.x = -dy * 0.003;
@@ -1731,8 +1371,21 @@
         angularVel: new THREE.Vector3((Math.random() - 0.5) * 6 + 9, (Math.random() - 0.5) * 10, -vx * 0.35), trailTimer: 0
       });
       readyPot = null;
-      if (cameraMode === 0 && (!renderer.xr || !renderer.xr.isPresenting)) { camera.fov = 62; cameraFovVelocity = 24; camera.updateProjectionMatrix(); }
+      if (cameraMode === 0 && !renderer.xr.isPresenting) { camera.fov = 62; cameraFovVelocity = 24; camera.updateProjectionMatrix(); }
       showSpeedLines(); playThrowWhooshAudio(Math.abs(vz) / 18.0); scheduleAutoRespawn(260);
+    }
+
+    function launchPotWithPhysics(pos, velocity) {
+        let potToThrow = readyPot;
+        if (!potToThrow || !potToThrow.mesh) return;
+        potToThrow.mesh.scale.set(1.0, 1.0, 1.0); // スケールを通常に戻す
+
+        flyingPots.push({
+            mesh: potToThrow.mesh, bodyMat: potToThrow.bodyMat, soilMat: potToThrow.soilMat, leafMat: potToThrow.leafMat,
+            potType: potToThrow.potType || activePotType, velocity: velocity.clone(),
+            angularVel: new THREE.Vector3((Math.random() - 0.5) * 6 + 9, (Math.random() - 0.5) * 10, -velocity.z * 0.35), trailTimer: 0
+        });
+        readyPot = null; showSpeedLines(); playThrowWhooshAudio(Math.abs(velocity.z) / 18.0);
     }
 
     function toggleShotgunMode() {
@@ -1751,14 +1404,9 @@
     }
 
     function updateCameraPositionImmediate() {
-      const cfg = cameraConfigs[cameraMode];
-      baseCameraPos.copy(cfg.pos);
-      if (renderer && renderer.xr && renderer.xr.isPresenting) {
-        cameraGroup.position.copy(baseCameraPos);
-      } else {
-        camera.position.copy(baseCameraPos);
-        camera.lookAt(cfg.target);
-      }
+      const cfg = cameraConfigs[cameraMode]; baseCameraPos.copy(cfg.pos);
+      if (renderer && renderer.xr && renderer.xr.isPresenting) { cameraGroup.position.copy(baseCameraPos); } 
+      else { camera.position.copy(baseCameraPos); camera.lookAt(cfg.target); }
     }
 
     function setPotType(type) {
@@ -1778,9 +1426,7 @@
     }
 
     function cyclePotType() {
-        let idx = potTypesList.indexOf(activePotType);
-        idx = (idx + 1) % potTypesList.length;
-        setPotType(potTypesList[idx]);
+        let idx = potTypesList.indexOf(activePotType); idx = (idx + 1) % potTypesList.length; setPotType(potTypesList[idx]);
     }
 
     function respawnReadyPot() {
@@ -1789,8 +1435,7 @@
     }
 
     function toggleSlowMo() {
-      isSlowMo = !isSlowMo; timeScale = isSlowMo ? 0.18 : 1.0;
-      const btn = document.getElementById('slowmo-btn');
+      isSlowMo = !isSlowMo; timeScale = isSlowMo ? 0.18 : 1.0; const btn = document.getElementById('slowmo-btn');
       if (isSlowMo) { btn.classList.add('bg-cyan-500/25', 'border-cyan-400'); showToast('スーパースローモーション ON'); }
       else btn.classList.remove('bg-cyan-500/25', 'border-cyan-400');
     }
@@ -1827,13 +1472,12 @@
       lastTimestamp = time;
 
       stepPhysics(dt);
-      updateVRControllers();
+      updateVRControllers(dt);
       renderer.render(scene, camera);
     }
 
     window.onload = function() {
       initScene();
-      // Use setAnimationLoop instead of requestAnimationFrame for WebXR compatibility
       renderer.setAnimationLoop(animateFrame);
     };
   </script>
