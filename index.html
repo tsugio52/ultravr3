@@ -344,6 +344,7 @@
     // VR Controls
     let controller1, controller2;
     let hand1, hand2;
+    let trackedHandVisuals = {}; // Questの関節トラッキングを可視化する手モデル
     let raycasterVR;
     let vrUI = [];
     let vrThrowCooldown = 0;
@@ -745,7 +746,7 @@
       renderer.toneMapping = THREE.ACESFilmicToneMapping; renderer.toneMappingExposure = 1.25;
       renderer.xr.enabled = true; container.appendChild(renderer.domElement);
 
-      updateCameraPositionImmediate(); document.body.appendChild( VRButton.createButton( renderer ) );
+      updateCameraPositionImmediate(); document.body.appendChild( VRButton.createButton( renderer, { optionalFeatures: [ 'hand-tracking' ] } ) );
 
       raycaster = new THREE.Raycaster(); mouseNorm = new THREE.Vector2(0, 0);
 
@@ -804,6 +805,128 @@
       hand2 = renderer.xr.getHand(1);
       scene.add(hand1);
       scene.add(hand2);
+      setupTrackedHandVisuals();
+    }
+
+    // WebXRの各関節位置から、手のひら・指の関節球・指の骨を描画する。
+    // 実際の手の映像ではなく、Questのハンドトラッキングに追従する3D表現。
+    function setupTrackedHandVisuals() {
+      const jointNames = [
+        'wrist',
+        'thumb-metacarpal', 'thumb-phalanx-proximal', 'thumb-phalanx-distal', 'thumb-tip',
+        'index-finger-metacarpal', 'index-finger-phalanx-proximal', 'index-finger-phalanx-intermediate', 'index-finger-phalanx-distal', 'index-finger-tip',
+        'middle-finger-metacarpal', 'middle-finger-phalanx-proximal', 'middle-finger-phalanx-intermediate', 'middle-finger-phalanx-distal', 'middle-finger-tip',
+        'ring-finger-metacarpal', 'ring-finger-phalanx-proximal', 'ring-finger-phalanx-intermediate', 'ring-finger-phalanx-distal', 'ring-finger-tip',
+        'pinky-finger-metacarpal', 'pinky-finger-phalanx-proximal', 'pinky-finger-phalanx-intermediate', 'pinky-finger-phalanx-distal', 'pinky-finger-tip'
+      ];
+      const chains = [
+        ['wrist', 'thumb-metacarpal', 'thumb-phalanx-proximal', 'thumb-phalanx-distal', 'thumb-tip'],
+        ['wrist', 'index-finger-metacarpal', 'index-finger-phalanx-proximal', 'index-finger-phalanx-intermediate', 'index-finger-phalanx-distal', 'index-finger-tip'],
+        ['wrist', 'middle-finger-metacarpal', 'middle-finger-phalanx-proximal', 'middle-finger-phalanx-intermediate', 'middle-finger-phalanx-distal', 'middle-finger-tip'],
+        ['wrist', 'ring-finger-metacarpal', 'ring-finger-phalanx-proximal', 'ring-finger-phalanx-intermediate', 'ring-finger-phalanx-distal', 'ring-finger-tip'],
+        ['wrist', 'pinky-finger-metacarpal', 'pinky-finger-phalanx-proximal', 'pinky-finger-phalanx-intermediate', 'pinky-finger-phalanx-distal', 'pinky-finger-tip'],
+        ['index-finger-metacarpal', 'middle-finger-metacarpal', 'ring-finger-metacarpal', 'pinky-finger-metacarpal']
+      ];
+      const skinMat = new THREE.MeshStandardMaterial({ color: 0xd9a47f, roughness: 0.78, metalness: 0.0 });
+      const palmMat = new THREE.MeshStandardMaterial({ color: 0xe0b08b, roughness: 0.82, metalness: 0.0 });
+      const boneMat = new THREE.MeshStandardMaterial({ color: 0xd9a47f, roughness: 0.76, metalness: 0.0 });
+      ['left', 'right'].forEach(side => {
+        const group = new THREE.Group();
+        group.name = 'tracked-hand-' + side;
+        const joints = {};
+        jointNames.forEach(name => {
+          const mesh = new THREE.Mesh(new THREE.SphereGeometry(1, 10, 8), skinMat);
+          mesh.name = name;
+          mesh.visible = false;
+          group.add(mesh);
+          joints[name] = mesh;
+        });
+        const bones = [];
+        chains.forEach((chain, ci) => {
+          for (let i = 0; i < chain.length - 1; i++) {
+            const mesh = new THREE.Mesh(new THREE.CylinderGeometry(1, 1, 1, 8, 1, false), boneMat);
+            mesh.visible = false;
+            group.add(mesh);
+            bones.push({ mesh, a: chain[i], b: chain[i + 1], palmBridge: ci === 5 });
+          }
+        });
+        const palm = new THREE.Mesh(new THREE.SphereGeometry(1, 16, 12), palmMat);
+        palm.scale.set(0.047, 0.012, 0.065);
+        palm.visible = false;
+        group.add(palm);
+        scene.add(group);
+        trackedHandVisuals[side] = { group, joints, bones, palm, jointNames };
+      });
+    }
+
+    function updateTrackedHandVisuals(frame) {
+      if (!renderer.xr.isPresenting || !frame) {
+        Object.values(trackedHandVisuals).forEach(v => {
+          v.palm.visible = false;
+          Object.values(v.joints).forEach(m => m.visible = false);
+          v.bones.forEach(b => b.mesh.visible = false);
+        });
+        return;
+      }
+      const session = renderer.xr.getSession();
+      const referenceSpace = renderer.xr.getReferenceSpace();
+      if (!session || !referenceSpace) return;
+      const sourceBySide = { left: null, right: null };
+      for (const source of session.inputSources) {
+        if (source.hand && (source.handedness === 'left' || source.handedness === 'right')) sourceBySide[source.handedness] = source;
+      }
+      const up = new THREE.Vector3(0, 1, 0);
+      Object.keys(trackedHandVisuals).forEach(side => {
+        const visual = trackedHandVisuals[side];
+        const source = sourceBySide[side];
+        if (!source || !source.hand) {
+          visual.palm.visible = false;
+          Object.values(visual.joints).forEach(m => m.visible = false);
+          visual.bones.forEach(b => b.mesh.visible = false);
+          return;
+        }
+        const positions = {};
+        visual.jointNames.forEach(name => {
+          const jointSpace = source.hand.get(name);
+          const pose = jointSpace && frame.getJointPose ? frame.getJointPose(jointSpace, referenceSpace) : null;
+          const mesh = visual.joints[name];
+          if (!pose) { mesh.visible = false; return; }
+          const p = pose.transform.position;
+          const pos = new THREE.Vector3(p.x, p.y, p.z);
+          positions[name] = pos;
+          mesh.position.copy(pos);
+          const r = pose.radius && Number.isFinite(pose.radius) ? pose.radius : 0.009;
+          mesh.scale.setScalar(Math.max(0.005, Math.min(0.016, r * 0.88)));
+          mesh.visible = true;
+        });
+        visual.bones.forEach(b => {
+          const a = positions[b.a], c = positions[b.b];
+          if (!a || !c) { b.mesh.visible = false; return; }
+          const delta = c.clone().sub(a);
+          const length = delta.length();
+          if (length < 0.002) { b.mesh.visible = false; return; }
+          b.mesh.position.copy(a).add(c).multiplyScalar(0.5);
+          b.mesh.quaternion.setFromUnitVectors(up, delta.normalize());
+          const radius = b.palmBridge ? 0.013 : 0.0075;
+          b.mesh.scale.set(radius, length, radius);
+          b.mesh.visible = true;
+        });
+        const wrist = positions['wrist'];
+        const mcpNames = ['index-finger-metacarpal', 'middle-finger-metacarpal', 'ring-finger-metacarpal', 'pinky-finger-metacarpal'];
+        const mcps = mcpNames.map(n => positions[n]).filter(Boolean);
+        if (wrist && mcps.length >= 3) {
+          const center = mcps.reduce((acc, p) => acc.add(p), new THREE.Vector3()).multiplyScalar(1 / mcps.length).lerp(wrist, 0.28);
+          visual.palm.position.copy(center);
+          const across = positions['pinky-finger-metacarpal'].clone().sub(positions['index-finger-metacarpal']).normalize();
+          const fingers = positions['middle-finger-metacarpal'].clone().sub(wrist).normalize();
+          const normal = new THREE.Vector3().crossVectors(across, fingers).normalize();
+          const basis = new THREE.Matrix4().makeBasis(across, fingers, normal);
+          visual.palm.quaternion.setFromRotationMatrix(basis);
+          visual.palm.visible = true;
+        } else {
+          visual.palm.visible = false;
+        }
+      });
     }
 
     function getHandednessFromHand(hand) {
@@ -1625,6 +1748,7 @@
       lastTimestamp = time;
 
       stepPhysics(dt);
+      updateTrackedHandVisuals(frame);
       updateVRControllers(dt, frame);
       renderer.render(scene, camera);
     }
