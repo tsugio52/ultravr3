@@ -921,7 +921,9 @@
       const rawVelocity = current.clone().sub(state.lastPalm).divideScalar(safeDt);
       state.lastPalm.copy(current);
       state.velocity.copy(rawVelocity);
-      state.smoothVelocity.lerp(rawVelocity, 0.62);
+      // Release response: favor the latest hand movement so the pot does not
+      // feel glued to the palm by excessive velocity smoothing.
+      state.smoothVelocity.lerp(rawVelocity, 0.82);
 
       if (vrThrowCooldown > 0) return false;
       if (!readyPot || !readyPot.mesh) spawnReadyPot();
@@ -940,20 +942,23 @@
       const sidewaysSpeed = Math.abs(state.smoothVelocity.x);
       // 前方向を残しつつ、上方向の腕の振りも投擲動作として認識。
       const throwEnergy = Math.hypot(Math.max(0, forwardSpeed), upwardSpeed * 0.9);
-      const throwDetected = forwardSpeed > 0.75 &&
-                            state.smoothVelocity.length() > 1.0 &&
-                            throwEnergy > 1.15 &&
-                            forwardSpeed > sidewaysSpeed * 0.55;
+      const throwDetected = forwardSpeed > 0.42 &&
+                            state.smoothVelocity.length() > 0.78 &&
+                            throwEnergy > 0.82 &&
+                            forwardSpeed > sidewaysSpeed * 0.35;
       if (!throwDetected) return false;
 
       const throwVel = state.smoothVelocity.clone();
-      // 上向きの動きを以前より強く反映する。これで斜め上への投擲が可能。
-      throwVel.y *= 0.82;
-      throwVel.x *= 0.75;
-      throwVel.z = -THREE.MathUtils.clamp(forwardSpeed * 2.55, 5.0, 15.5);
-      if (upwardSpeed > 0.8) throwVel.y += Math.min(upwardSpeed * 0.35, 2.8);
-      launchPotWithPhysics(current.clone(), throwVel);
-      vrThrowCooldown = 0.34;
+      // Amplify the tracked arm swing, while preserving a natural upward arc.
+      throwVel.y *= 1.05;
+      throwVel.x *= 0.85;
+      throwVel.z = -THREE.MathUtils.clamp(forwardSpeed * 3.8, 6.5, 23.0);
+      if (upwardSpeed > 0.45) throwVel.y += Math.min(upwardSpeed * 0.5, 4.0);
+      // Release from the pot's actual held position (including palm offset),
+      // avoiding the visible snap from the palm center at the moment of release.
+      const releasePosition = readyPot.mesh.position.clone();
+      launchPotWithPhysics(releasePosition, throwVel);
+      vrThrowCooldown = 0.24;
       state.lastPalm = current.clone();
       state.smoothVelocity.set(0, 0, 0);
       return true;
@@ -993,7 +998,8 @@
       const rawVel = currentPos.clone().sub(data.lastPos).divideScalar(Math.max(0.008, dt || 0.016));
       data.lastPos.copy(currentPos);
       if (!data.vel) data.vel = new THREE.Vector3();
-      data.vel.lerp(rawVel, 0.5);
+      // Reduce lag between controller motion and the release velocity.
+      data.vel.lerp(rawVel, 0.78);
 
       if (vrThrowCooldown <= 0) {
         if (!readyPot || !readyPot.mesh) spawnReadyPot();
@@ -1005,13 +1011,14 @@
           readyPot.spawnProgress = 1.0;
 
           const forwardSpeed = -data.vel.z;
-          if (forwardSpeed > 1.25 && data.vel.length() > 1.45) {
+          if (forwardSpeed > 0.55 && data.vel.length() > 0.85) {
             const throwVel = data.vel.clone();
-            throwVel.y *= 0.35;
-            throwVel.x *= 0.75;
-            throwVel.z = -THREE.MathUtils.clamp(forwardSpeed * 2.55, 5.8, 15.5);
-            launchPotWithPhysics(currentPos.clone(), throwVel);
-            vrThrowCooldown = 0.34;
+            throwVel.y *= 0.7;
+            throwVel.x *= 0.85;
+            throwVel.z = -THREE.MathUtils.clamp(forwardSpeed * 3.8, 6.5, 23.0);
+            const releasePosition = readyPot.mesh.position.clone();
+            launchPotWithPhysics(releasePosition, throwVel);
+            vrThrowCooldown = 0.24;
           }
         }
       }
